@@ -384,3 +384,28 @@ Reverse engineered the NASA Spitzer Space Telescope site and its embedded 3D ren
 3. Roadmap for Improving SkyTrace's 3D Explorer:
    - Proposed integrating the authentic NASA 3D telescope model directly into `frontend/app/components/sky/CelestialSphere.tsx` with a Spacecraft Boresight view toggle, dynamic Sun-exclusion zone cone, and orientation tracking.
 ---
+
+### Turn 28 - [2026-10-28 13:05:00]
+#### 👤 User Prompt:
+Okay plan it first and do it as you say in two view modes, by testing phase by phase
+
+#### 🤖 Agent Response:
+Planned, implemented, tested phase by phase, and visually verified the Dual View Mode integration with authentic NASA Spitzer 3D Spacecraft:
+1. Phase 1: 3D Asset Integration & GLTF Verification:
+   - Downloaded official NASA assets into `frontend/public/models/spitzer/`: `SPITZER.gltf` (23.2 KB), `spitzer.bin` (899.1 KB), `spitzer_albedo.jpg`, `spitzer_normal.png`, `spitzer_pbr.jpg`, and `foil_normal.png`.
+   - Verified assets via automated test script `frontend/test_phase6_spacecraft_model.mjs`.
+2. Phase 2: State Management & Observation Modes:
+   - Updated `frontend/app/store/skyStore.ts` with `viewMode: 'sky' | 'spacecraft'`, `showSunExclusion`, `showBoresight`, and setter actions.
+   - Added dual Observation Mode segmented switch (`[ 🌌 Sky Survey ]` ⟷ `[ 🛰️ Spacecraft ]`) in `ControlToggles.tsx`.
+3. Phase 3: Three.js Spacecraft Model & Slew Mechanics:
+   - Updated `frontend/app/components/sky/CelestialSphere.tsx` with `GLTFLoader`, ACESFilmic tonemapping, vacuum directional sunlight (3.2 intensity), earthshine fill light, glowing cyan aperture boresight ray, and 85° Sun Exclusion warning cone.
+   - Implemented real-time quaternion slerp rotation (`spacecraftGroup.quaternion.slerp(targetQuat, 0.06)`) aligning the +Z aperture to active target RA/Dec.
+   - Configured smooth camera position and target elevation (`controls.target.lerp(0, 3.5, 0)`) framing the spacecraft clearly in the upper viewport above instrument panels.
+4. Phase 4: HUD & Telemetry Synchronization:
+   - Updated `frontend/app/components/sky/SkyHUD.tsx` with dynamic Spitzer Spacecraft CTA telemetry card: Cryo Assembly (1.4K L-He Dewar), Target Alignment angles, and Solar Margin indicator.
+5. Phase 5: Verification & Production Deployment:
+   - Ran automated test suite `frontend/test_phase6_spacecraft_model.mjs`: All 8 checks passed.
+   - Built optimized production bundle with `npm run build` (0 errors, 6/6 static pages).
+   - Executed browser visual validation across both modes: verified mode switching, realistic gold foil rendering, slewing toward Orion/Crab Nebula presets, and camera transitions.
+   - Committed changes and pushed to remote GitHub repository (`https://github.com/ZelalemAzmera/skytrace.git`).
+---
