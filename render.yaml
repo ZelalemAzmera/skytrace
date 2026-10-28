@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: skytrace-backend
+    runtime: python
+    region: oregon
+    plan: free
+    branch: main
+    buildCommand: pip install -r backend/requirements.txt
+    startCommand: cd backend && uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: DATABASE_URL
+        value: sqlite+aiosqlite:///./data/skytrace.db
+      - key: LOG_LEVEL
+        value: INFO

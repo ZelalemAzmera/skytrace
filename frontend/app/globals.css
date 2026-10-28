@@ -1,0 +1,78 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+:root {
+  --bg-primary: #060810;
+  --bg-secondary: #0D1220;
+  --bg-card: rgba(13, 18, 32, 0.7);
+  --bg-glass: rgba(13, 18, 32, 0.85);
+  
+  --border-subtle: rgba(255, 255, 255, 0.08);
+  --border-hover: rgba(0, 229, 255, 0.3);
+  --border-active: rgba(0, 229, 255, 0.6);
+  
+  --text-primary: #F0F4FF;
+  --text-secondary: #8892B0;
+  --text-muted: #4A5568;
+  
+  --accent-cyan: #00E5FF;
+  --accent-orange: #FF6B35;
+  --accent-gold: #FFD166;
+  --accent-purple: #9D4EDD;
+  --accent-green: #06D6A0;
+  --danger: #EF476F;
+
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  overflow-x: hidden;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Glassmorphism panel utility */
+.glass-panel {
+  background: var(--bg-glass);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+}
+
+.glass-panel:hover {
+  border-color: var(--border-hover);
+}
+
+/* Monospace scientific data */
+.font-mono {
+  font-family: var(--font-mono);
+}
+
+/* Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg-primary);
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--accent-cyan);
+}

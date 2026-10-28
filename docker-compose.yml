@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_API_URL: "http://localhost:8000"
+    depends_on:
+      - backend
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    environment:
+      REDIS_URL: "redis://redis:6379"
+      DATABASE_URL: "sqlite+aiosqlite:///./data/skytrace.db"
+      IRSA_SIA2_URL: "https://irsa.ipac.caltech.edu/ibe/sia2/spherex/qr3"
+      IRSA_IBE_URL: "https://irsa.ipac.caltech.edu/ibe/data/spherex/qr3"
+      IRSA_MOST_URL: "https://irsa.ipac.caltech.edu/applications/MOST"
+      LOG_LEVEL: "INFO"
+    volumes:
+      - ./backend:/app
+      - ./backend/data:/app/data
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  redis_data:
