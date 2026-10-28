@@ -35,7 +35,13 @@ export interface SkyState {
   showStarLabels: boolean;
   autoRotate: boolean;
 
+  // View Mode: Sky Survey vs Spacecraft Observation Geometry
+  viewMode: 'sky' | 'spacecraft';
+  showSunExclusion: boolean;
+  showBoresight: boolean;
+
   // Actions
+  setViewMode: (mode: 'sky' | 'spacecraft') => void;
   setCoordinates: (ra: number, dec: number, presetName?: string) => void;
   setRadius: (radius: number) => void;
   setSelectedBand: (band: number) => void;
@@ -53,6 +59,8 @@ export interface SkyState {
       | 'showScanPath'
       | 'showStarLabels'
       | 'autoRotate'
+      | 'showSunExclusion'
+      | 'showBoresight'
   ) => void;
   reset: () => void;
 }
@@ -78,6 +86,12 @@ export const useSkyStore = create<SkyState>((set) => ({
   showScanPath: true,
   showStarLabels: true,
   autoRotate: true,
+
+  viewMode: 'sky',
+  showSunExclusion: true,
+  showBoresight: true,
+
+  setViewMode: (viewMode) => set({ viewMode }),
 
   setCoordinates: (ra, dec, presetName) =>
     set({

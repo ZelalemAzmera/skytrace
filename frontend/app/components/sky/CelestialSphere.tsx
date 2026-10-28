@@ -3,6 +3,7 @@
 import React, { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
 import { useSkyStore } from '../../store/skyStore';
 import {
   icrsToUnitVector,
@@ -25,6 +26,9 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
   const {
     ra,
     dec,
+    viewMode,
+    showSunExclusion,
+    showBoresight,
     showEquatorialGrid,
     showEclipticGrid,
     showGalacticPlane,
@@ -38,6 +42,9 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
   const storeValuesRef = useRef({
     ra,
     dec,
+    viewMode,
+    showSunExclusion,
+    showBoresight,
     showEquatorialGrid,
     showEclipticGrid,
     showGalacticPlane,
@@ -50,6 +57,9 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
     storeValuesRef.current = {
       ra,
       dec,
+      viewMode,
+      showSunExclusion,
+      showBoresight,
       showEquatorialGrid,
       showEclipticGrid,
       showGalacticPlane,
@@ -60,6 +70,9 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
   }, [
     ra,
     dec,
+    viewMode,
+    showSunExclusion,
+    showBoresight,
     showEquatorialGrid,
     showEclipticGrid,
     showGalacticPlane,
@@ -91,15 +104,29 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
     });
     renderer.setSize(container.clientWidth, container.clientHeight);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.15;
     container.appendChild(renderer.domElement);
 
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.05;
-    controls.minDistance = 30;
+    controls.minDistance = 6;
     controls.maxDistance = 320;
     controls.autoRotate = autoRotate;
     controls.autoRotateSpeed = 0.35;
+
+    // --- 1.5 Vacuum PBR Space Lighting ---
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+    scene.add(ambientLight);
+
+    const sunDirLight = new THREE.DirectionalLight(0xfff6ea, 3.2);
+    sunDirLight.position.set(80, 50, 100);
+    scene.add(sunDirLight);
+
+    const earthShineLight = new THREE.DirectionalLight(0x3a6088, 1.0);
+    earthShineLight.position.set(-60, -30, -80);
+    scene.add(earthShineLight);
 
     // --- 2. Celestial Sphere Mesh ---
     const sphereRadius = 100;
@@ -113,6 +140,67 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
     });
     const sphereMesh = new THREE.Mesh(sphereGeo, sphereMat);
     scene.add(sphereMesh);
+
+    // --- 2.5 Authentic NASA Spitzer 3D Spacecraft & Boresight Ray ---
+    const spacecraftGroup = new THREE.Group();
+    scene.add(spacecraftGroup);
+
+    // Boresight line-of-sight laser ray along +Z (aperture vector)
+    const rayLength = sphereRadius * 0.985;
+    const rayGeo = new THREE.CylinderGeometry(0.06, 0.3, rayLength, 8);
+    rayGeo.translate(0, rayLength / 2, 0);
+    rayGeo.rotateX(Math.PI / 2);
+    const rayMat = new THREE.MeshBasicMaterial({
+      color: 0x00e5ff,
+      transparent: true,
+      opacity: 0.65,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    });
+    const boresightRay = new THREE.Mesh(rayGeo, rayMat);
+    spacecraftGroup.add(boresightRay);
+
+    // 85° Solar Exclusion Cone (Cryogenic Thermal Limit)
+    // Points toward directional sunlight vector
+    const sunVector = new THREE.Vector3(80, 50, 100).normalize();
+    const coneGeo = new THREE.ConeGeometry(55, 65, 32, 1, true);
+    coneGeo.translate(0, -32.5, 0);
+    coneGeo.rotateX(Math.PI / 2);
+    const coneMat = new THREE.MeshBasicMaterial({
+      color: 0xff9900,
+      transparent: true,
+      opacity: 0.12,
+      wireframe: true,
+      side: THREE.DoubleSide,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    });
+    const sunExclusionCone = new THREE.Mesh(coneGeo, coneMat);
+    sunExclusionCone.lookAt(sunVector);
+    scene.add(sunExclusionCone);
+
+    // Load NASA Spitzer GLTF Model
+    const gltfLoader = new GLTFLoader();
+    gltfLoader.load(
+      '/models/spitzer/SPITZER.gltf',
+      (gltf) => {
+        const model = gltf.scene;
+        model.scale.set(1.4, 1.4, 1.4);
+        model.traverse((child) => {
+          if ((child as THREE.Mesh).isMesh) {
+            const m = child as THREE.Mesh;
+            if (m.material) {
+              const mat = m.material as THREE.MeshStandardMaterial;
+              mat.roughness = 0.35;
+              mat.metalness = 0.85;
+            }
+          }
+        });
+        spacecraftGroup.add(model);
+      },
+      undefined,
+      (err) => console.warn('NASA Spitzer GLTF model load error:', err)
+    );
 
     // --- 3. Milky Way Great Circle Dust Band ---
     const mwCount = 9000;
@@ -614,6 +702,37 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
       targetGroup.position.copy(targetPos);
       targetGroup.lookAt(new THREE.Vector3(0, 0, 0));
 
+      // --- Spacecraft Slew: Smoothly rotate model along +Z aperture to point at target RA/Dec ---
+      const targetDir = icrsToUnitVector(
+        storeValuesRef.current.ra,
+        storeValuesRef.current.dec,
+        1.0
+      ).normalize();
+      const modelAperture = new THREE.Vector3(0, 0, 1);
+      const targetQuat = new THREE.Quaternion().setFromUnitVectors(modelAperture, targetDir);
+      spacecraftGroup.quaternion.slerp(targetQuat, 0.06);
+
+      // Toggles for Boresight and Sun Exclusion Zone
+      boresightRay.visible = storeValuesRef.current.showBoresight;
+      sunExclusionCone.visible = storeValuesRef.current.showSunExclusion;
+
+      // View Mode Transitions: Sky Survey (wide) vs Spacecraft (close-up orbiting telescope)
+      if (storeValuesRef.current.viewMode === 'spacecraft') {
+        controls.minDistance = 6;
+        controls.maxDistance = 65;
+        if (camera.position.length() > 38) {
+          camera.position.lerp(new THREE.Vector3(12, 12, 20), 0.05);
+        }
+        controls.target.lerp(new THREE.Vector3(0, 3.5, 0), 0.05);
+      } else {
+        controls.minDistance = 30;
+        controls.maxDistance = 320;
+        if (camera.position.length() < 70) {
+          camera.position.lerp(new THREE.Vector3(0, 30, 160), 0.05);
+        }
+        controls.target.lerp(new THREE.Vector3(0, 0, 0), 0.05);
+      }
+
       // Pulse reticle
       const scale1 = 1.0 + Math.sin(elapsed * 3) * 0.08;
       const scale2 = 1.0 + Math.cos(elapsed * 2.5) * 0.12;
@@ -659,6 +778,10 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
       ring1Mat.dispose();
       ring2Geo.dispose();
       ring2Mat.dispose();
+      rayGeo.dispose();
+      rayMat.dispose();
+      coneGeo.dispose();
+      coneMat.dispose();
 
       if (container.contains(renderer.domElement)) {
         container.removeChild(renderer.domElement);

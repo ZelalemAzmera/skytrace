@@ -1,12 +1,14 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import * as THREE from 'three';
 import { useSkyStore } from '../../store/skyStore';
 import {
   formatRA,
   formatDec,
   equatorialToGalactic,
   equatorialToEcliptic,
+  icrsToUnitVector,
   SKY_PRESETS,
 } from '../../lib/astrometry';
 import {
@@ -23,12 +25,16 @@ import {
   Globe,
   Search,
   CheckCircle,
+  Telescope,
+  ShieldCheck,
+  ShieldAlert,
 } from 'lucide-react';
 
 export default function SkyHUD() {
   const {
     ra,
     dec,
+    viewMode,
     activePresetName,
     hoveredObject,
     setCoordinates,
@@ -61,6 +67,13 @@ export default function SkyHUD() {
 
   const galactic = equatorialToGalactic(ra, dec);
   const ecliptic = equatorialToEcliptic(ra, dec);
+
+  // Compute Solar Separation Angle
+  const sunVector = new THREE.Vector3(80, 50, 100).normalize();
+  const targetVector = icrsToUnitVector(ra, dec, 1.0).normalize();
+  const sunDot = Math.max(-1, Math.min(1, targetVector.dot(sunVector)));
+  const sunSepAngle = (Math.acos(sunDot) * 180) / Math.PI;
+  const isSunSafe = sunSepAngle >= 85.0;
 
   const handleManualSlew = (e: React.FormEvent) => {
     e.preventDefault();
@@ -250,6 +263,60 @@ export default function SkyHUD() {
               </button>
             ))}
           </div>
+        </div>
+      </div>
+
+      {/* Spacecraft Telemetry Card */}
+      <div
+        className={`glass-panel p-3 pointer-events-auto transition-all ${
+          viewMode === 'spacecraft'
+            ? 'border border-[var(--accent-cyan)] shadow-[0_0_15px_rgba(0,229,255,0.15)] bg-[rgba(13,18,32,0.95)]'
+            : 'bg-[rgba(13,18,32,0.85)]'
+        }`}
+      >
+        <div className="flex items-center justify-between pb-1.5 mb-2 border-b border-[var(--border-subtle)]">
+          <div className="flex items-center gap-1.5 text-xs font-bold text-[var(--text-primary)]">
+            <Telescope className="w-3.5 h-3.5 text-[var(--accent-cyan)]" />
+            <span>Spitzer Spacecraft CTA</span>
+          </div>
+          <span
+            className={`text-[9px] font-mono px-1.5 py-0.5 rounded uppercase font-semibold ${
+              viewMode === 'spacecraft'
+                ? 'bg-[var(--accent-cyan)] text-[#060810]'
+                : 'bg-[rgba(0,229,255,0.1)] text-[var(--accent-cyan)] border border-[rgba(0,229,255,0.3)]'
+            }`}
+          >
+            {viewMode === 'spacecraft' ? 'Close Orbit' : 'Boresight Lock'}
+          </span>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2 text-xs font-mono">
+          <div>
+            <div className="text-[10px] text-[var(--text-muted)]">Cryo Assembly</div>
+            <div className="text-[var(--text-primary)] font-semibold text-[11px]">1.4K L-He Dewar</div>
+          </div>
+          <div>
+            <div className="text-[10px] text-[var(--text-muted)]">Solar Margin</div>
+            <div
+              className={`font-semibold text-[11px] flex items-center gap-1 ${
+                isSunSafe ? 'text-[var(--accent-green)]' : 'text-[var(--accent-orange)]'
+              }`}
+            >
+              {isSunSafe ? (
+                <ShieldCheck className="w-3 h-3 text-[var(--accent-green)]" />
+              ) : (
+                <ShieldAlert className="w-3 h-3 text-[var(--accent-orange)] animate-pulse" />
+              )}
+              <span>{sunSepAngle.toFixed(1)}° ({isSunSafe ? 'Safe' : 'Limit'})</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-2 pt-1.5 border-t border-[var(--border-subtle)] text-[10px] font-mono flex items-center justify-between text-[var(--text-secondary)]">
+          <span>Target Alignment</span>
+          <span className="text-[var(--accent-cyan)] font-semibold">
+            {ra.toFixed(2)}°, {dec.toFixed(2)}°
+          </span>
         </div>
       </div>
 

@@ -10,10 +10,17 @@ import {
   Orbit,
   Eye,
   SlidersHorizontal,
+  Telescope,
+  Compass,
+  ShieldAlert,
 } from 'lucide-react';
 
 export default function ControlToggles() {
   const {
+    viewMode,
+    setViewMode,
+    showSunExclusion,
+    showBoresight,
     showEquatorialGrid,
     showEclipticGrid,
     showGalacticPlane,
@@ -24,6 +31,20 @@ export default function ControlToggles() {
   } = useSkyStore();
 
   const toggleItems = [
+    {
+      key: 'showBoresight' as const,
+      label: 'Boresight Laser Ray',
+      active: showBoresight,
+      color: 'var(--accent-cyan)',
+      icon: <Compass className="w-3.5 h-3.5" />,
+    },
+    {
+      key: 'showSunExclusion' as const,
+      label: 'Sun Exclusion Cone (85°)',
+      active: showSunExclusion,
+      color: 'var(--accent-orange)',
+      icon: <ShieldAlert className="w-3.5 h-3.5" />,
+    },
     {
       key: 'showEquatorialGrid' as const,
       label: 'Equatorial Grid (α, δ)',
@@ -70,6 +91,38 @@ export default function ControlToggles() {
 
   return (
     <div className="absolute top-4 right-4 z-20 flex flex-col gap-2 pointer-events-auto">
+      {/* 1. Observation View Mode Switcher */}
+      <div className="glass-panel p-2 backdrop-blur-md">
+        <div className="text-[10px] font-mono uppercase tracking-wider text-[var(--text-muted)] mb-1.5 px-1">
+          Observation Mode
+        </div>
+        <div className="grid grid-cols-2 gap-1 p-0.5 rounded-lg bg-[rgba(6,8,16,0.6)] border border-[var(--border-subtle)]">
+          <button
+            onClick={() => setViewMode('sky')}
+            className={`py-1 px-2 rounded-md text-xs font-mono font-medium flex items-center justify-center gap-1.5 transition-all ${
+              viewMode === 'sky'
+                ? 'bg-[var(--accent-cyan)] text-[#060810] font-bold shadow-[0_0_12px_rgba(0,229,255,0.4)]'
+                : 'text-[var(--text-secondary)] hover:text-white'
+            }`}
+          >
+            <Eye className="w-3.5 h-3.5" />
+            <span>Sky Survey</span>
+          </button>
+          <button
+            onClick={() => setViewMode('spacecraft')}
+            className={`py-1 px-2 rounded-md text-xs font-mono font-medium flex items-center justify-center gap-1.5 transition-all ${
+              viewMode === 'spacecraft'
+                ? 'bg-[var(--accent-cyan)] text-[#060810] font-bold shadow-[0_0_12px_rgba(0,229,255,0.4)]'
+                : 'text-[var(--text-secondary)] hover:text-white'
+            }`}
+          >
+            <Telescope className="w-3.5 h-3.5" />
+            <span>Spacecraft</span>
+          </button>
+        </div>
+      </div>
+
+      {/* 2. Layer Toggles */}
       <div className="glass-panel p-2.5 backdrop-blur-md">
         <div className="flex items-center gap-2 mb-2 pb-1.5 border-b border-[var(--border-subtle)] text-[11px] font-mono uppercase tracking-wider text-[var(--text-secondary)]">
           <SlidersHorizontal className="w-3.5 h-3.5 text-[var(--accent-cyan)]" />
