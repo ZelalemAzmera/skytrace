@@ -10,6 +10,10 @@ class ParallaxCalculator:
         cls,
         pixel_shift: float,
         baseline_days: float = 182.625,  # ~6 months (half Earth orbit = 2 AU baseline)
+        earth1_helio_ecl=None,
+        earth2_helio_ecl=None,
+        ra_deg: float | None = None,
+        dec_deg: float | None = None,
     ) -> ParallaxResult:
         """Calculate parallax and distance from observed pixel shift between epochs.
         
@@ -22,6 +26,21 @@ class ParallaxCalculator:
         """
         shift = abs(pixel_shift)
         motion_arcsec = shift * cls.SPHEREX_PIXEL_SCALE_ARCSEC
+
+        # Exact path: delegate to the calculation engine using real Earth vectors
+        # (heliocentric ecliptic, AU) and the target direction.
+        if earth1_helio_ecl is not None and earth2_helio_ecl is not None and ra_deg is not None and dec_deg is not None:
+            from space_object_explorer import parallax_distance  # lazy: engine needs astropy/astroquery
+            r = parallax_distance(motion_arcsec, earth1_helio_ecl, earth2_helio_ecl, ra_deg, dec_deg)
+            pc, ly = r['distance_pc'], r['distance_ly']
+            return ParallaxResult(
+                pixel_shift=round(shift, 4),
+                proper_motion_arcsec=round(motion_arcsec, 4),
+                parallax_arcsec=round(motion_arcsec / r['baseline_perp_au'], 4) if r['baseline_perp_au'] > 1e-6 else 0.0,  # annual-equivalent (1 AU) parallax
+                distance_pc=round(pc, 2) if pc is not None else None,
+                distance_ly=round(ly, 2) if ly is not None else None,
+                is_bound=pc is not None and pc <= 1000.0,
+            )
         
         # Scale to annual parallax based on baseline
         baseline_fraction = baseline_days / 365.25

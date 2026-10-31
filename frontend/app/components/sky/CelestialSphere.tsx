@@ -37,6 +37,7 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
     autoRotate,
     setCoordinates,
     setHoveredObject,
+    planetXMarker,
   } = useSkyStore();
 
   const storeValuesRef = useRef({
@@ -51,6 +52,7 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
     showOrrery,
     showScanPath,
     autoRotate,
+    planetXMarker,
   });
 
   useEffect(() => {
@@ -66,6 +68,7 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
       showOrrery,
       showScanPath,
       autoRotate,
+      planetXMarker,
     };
   }, [
     ra,
@@ -79,6 +82,7 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
     showOrrery,
     showScanPath,
     autoRotate,
+    planetXMarker,
   ]);
 
   useEffect(() => {
@@ -111,7 +115,7 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.05;
-    controls.minDistance = 6;
+    controls.minDistance = 0.5;
     controls.maxDistance = 320;
     controls.autoRotate = autoRotate;
     controls.autoRotateSpeed = 0.35;
@@ -143,6 +147,7 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
 
     // --- 2.5 Authentic NASA Spitzer 3D Spacecraft & Boresight Ray ---
     const spacecraftGroup = new THREE.Group();
+    spacecraftGroup.visible = false; // hidden until Spacecraft mode is selected
     scene.add(spacecraftGroup);
 
     // Boresight line-of-sight laser ray along +Z (aperture vector)
@@ -177,6 +182,7 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
     });
     const sunExclusionCone = new THREE.Mesh(coneGeo, coneMat);
     sunExclusionCone.lookAt(sunVector);
+    sunExclusionCone.visible = false;
     scene.add(sunExclusionCone);
 
     // Load NASA Spitzer GLTF Model
@@ -508,6 +514,14 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
     targetGroup.add(ring1);
     targetGroup.add(ring2);
 
+    // Hypothetical Planet X marker (magenta), placed at its sky direction for the selected date
+    const planetXGroup = new THREE.Group();
+    planetXGroup.visible = false;
+    scene.add(planetXGroup);
+    const pxMat = new THREE.MeshBasicMaterial({ color: 0xff3df2, side: THREE.DoubleSide, transparent: true, opacity: 0.9 });
+    planetXGroup.add(new THREE.Mesh(new THREE.RingGeometry(1.6, 2.1, 32), pxMat));
+    planetXGroup.add(new THREE.Mesh(new THREE.CircleGeometry(0.5, 16), pxMat));
+
     // Sample Known Transient Candidates on Sphere
     const sampleCandidates = [
       { id: 'cand-001', ra: 83.8221, dec: -5.3911, confidence: 0.87, type: 'Y-Dwarf' },
@@ -545,6 +559,38 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
       mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
 
       raycaster.setFromCamera(mouse, camera);
+
+      // Planet hover: name, time and orbital speed (screen-space pick, planets are tiny)
+      if (storeValuesRef.current.showOrrery) {
+        const px = e.clientX - rect.left;
+        const py = e.clientY - rect.top;
+        let best: { d: number; mesh: THREE.Mesh; orbit: (typeof PLANET_ORBITS)[0] } | null = null;
+        planetMeshes.forEach(({ mesh, orbit }) => {
+          const ndc = mesh.position.clone().project(camera);
+          if (ndc.z > 1) return; // behind camera
+          const sx = ((ndc.x + 1) / 2) * rect.width;
+          const sy = ((1 - ndc.y) / 2) * rect.height;
+          const d = Math.hypot(sx - px, sy - py);
+          if (d < 16 && (!best || d < best.d)) best = { d, mesh, orbit };
+        });
+        if (best) {
+          const { mesh, orbit } = best as { d: number; mesh: THREE.Mesh; orbit: (typeof PLANET_ORBITS)[0] };
+          const rAu = mesh.position.length() / 6.0; // scene units -> AU (orrery scale = 6)
+          // vis-viva: v = 29.7847 km/s * sqrt(2/r - 1/a)  (1 AU circular speed)
+          const vKms = 29.7847 * Math.sqrt(Math.max(0, 2 / rAu - 1 / orbit.a));
+          const when = new Date().toISOString().replace('T', ' ').slice(0, 19) + ' UTC';
+          const dir = vectorToIcrs(mesh.position.clone().normalize().multiplyScalar(sphereRadius));
+          setHoveredObject({
+            name: orbit.name,
+            ra: dir.ra,
+            dec: dir.dec,
+            type: 'Planet',
+            extra: `${when} | Speed: ${vKms.toFixed(2)} km/s | Sun dist: ${rAu.toFixed(3)} AU | Period: ${(orbit.periodDays / 365.25).toFixed(2)} yr`,
+          });
+          renderer.domElement.style.cursor = 'pointer';
+          return;
+        }
+      }
 
       // Check candidate hover
       const candHits = raycaster.intersectObjects(candidateMeshes.map((c) => c.mesh));
@@ -653,6 +699,8 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
     // --- 11. Animation Loop ---
     let animationId: number;
     let clock = new THREE.Clock();
+    let lastViewMode = storeValuesRef.current.viewMode;
+    let transitionFrames = 0;
 
     const animate = () => {
       animationId = requestAnimationFrame(animate);
@@ -702,6 +750,14 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
       targetGroup.position.copy(targetPos);
       targetGroup.lookAt(new THREE.Vector3(0, 0, 0));
 
+      // Planet X sky marker
+      const pxm = storeValuesRef.current.planetXMarker;
+      planetXGroup.visible = !!pxm;
+      if (pxm) {
+        planetXGroup.position.copy(icrsToUnitVector(pxm.ra, pxm.dec, sphereRadius * 0.985));
+        planetXGroup.lookAt(new THREE.Vector3(0, 0, 0));
+      }
+
       // --- Spacecraft Slew: Smoothly rotate model along +Z aperture to point at target RA/Dec ---
       const targetDir = icrsToUnitVector(
         storeValuesRef.current.ra,
@@ -712,25 +768,39 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
       const targetQuat = new THREE.Quaternion().setFromUnitVectors(modelAperture, targetDir);
       spacecraftGroup.quaternion.slerp(targetQuat, 0.06);
 
-      // Toggles for Boresight and Sun Exclusion Zone
-      boresightRay.visible = storeValuesRef.current.showBoresight;
-      sunExclusionCone.visible = storeValuesRef.current.showSunExclusion;
+      // Spacecraft is hidden until selected; when active it orbits Earth and the camera follows it
+      const isSc = storeValuesRef.current.viewMode === 'spacecraft';
+      spacecraftGroup.visible = isSc;
+      boresightRay.visible = isSc && storeValuesRef.current.showBoresight;
+      sunExclusionCone.visible = isSc && storeValuesRef.current.showSunExclusion;
+      const earthEntry = planetMeshes.find((p) => p.orbit.name === 'Earth');
+      if (earthEntry) {
+        spacecraftGroup.position.copy(earthEntry.mesh.position);
+        sunExclusionCone.position.copy(earthEntry.mesh.position);
+      }
 
-      // View Mode Transitions: Sky Survey (wide) vs Spacecraft (close-up orbiting telescope)
-      if (storeValuesRef.current.viewMode === 'spacecraft') {
-        controls.minDistance = 6;
+      // View mode transitions: camera is moved once on a mode change, then zoom is free
+      if (lastViewMode !== storeValuesRef.current.viewMode) {
+        lastViewMode = storeValuesRef.current.viewMode;
+        transitionFrames = 90;
+      }
+      if (isSc) {
+        controls.minDistance = 2;
         controls.maxDistance = 65;
-        if (camera.position.length() > 38) {
-          camera.position.lerp(new THREE.Vector3(12, 12, 20), 0.05);
+        const sc = spacecraftGroup.position;
+        if (transitionFrames > 0) {
+          camera.position.lerp(sc.clone().add(new THREE.Vector3(12, 12, 20)), 0.06);
+          transitionFrames--;
         }
-        controls.target.lerp(new THREE.Vector3(0, 3.5, 0), 0.05);
+        controls.target.lerp(sc, 0.1); // zoom toward the satellite
       } else {
-        controls.minDistance = 30;
+        controls.minDistance = 0.5; // no hard cap: can zoom right in on the Sun / planets
         controls.maxDistance = 320;
-        if (camera.position.length() < 70) {
-          camera.position.lerp(new THREE.Vector3(0, 30, 160), 0.05);
+        if (transitionFrames > 0) {
+          camera.position.lerp(new THREE.Vector3(0, 30, 160), 0.06);
+          transitionFrames--;
         }
-        controls.target.lerp(new THREE.Vector3(0, 0, 0), 0.05);
+        controls.target.lerp(new THREE.Vector3(0, 0, 0), 0.1); // zoom toward the Sun
       }
 
       // Pulse reticle

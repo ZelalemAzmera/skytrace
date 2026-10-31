@@ -36,6 +36,24 @@ export function useWavelengths() {
   });
 }
 
+// Backend returns candidates as {ra, dec, ...}; the UI expects {ra_deg, dec_deg, ...}.
+function normalizeComparison(data: any): ComparisonResult {
+  const num = (v: unknown, d = 0) => (typeof v === 'number' && isFinite(v) ? v : d);
+  const candidates = (data?.candidates ?? []).map((c: any) => ({
+    ...c,
+    comparison_id: c.comparison_id ?? data?.comparison_id ?? '',
+    ra_deg: num(c.ra_deg ?? c.ra),
+    dec_deg: num(c.dec_deg ?? c.dec),
+    pixel_x: num(c.pixel_x),
+    pixel_y: num(c.pixel_y),
+    snr_change: num(c.snr_change),
+    confidence_score: num(c.confidence_score),
+    classification: c.classification ?? 'Unclassified',
+    caveats: c.caveats ?? [],
+  }));
+  return { ...data, candidates };
+}
+
 export function useComparison(obsAId: string | null, obsBId: string | null, band = 50) {
   return useQuery<ComparisonResult>({
     queryKey: ['comparison', obsAId, obsBId, band],
@@ -46,7 +64,8 @@ export function useComparison(obsAId: string | null, obsBId: string | null, band
       if (!res.ok) {
         throw new Error(`Failed to compare observations: ${res.statusText}`);
       }
-      return res.json();
+      const data = await res.json();
+      return normalizeComparison(data);
     },
     enabled: !!obsAId && !!obsBId,
     staleTime: 30 * 60 * 1000,
