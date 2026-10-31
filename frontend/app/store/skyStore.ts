@@ -40,6 +40,10 @@ export interface SkyState {
   showSunExclusion: boolean;
   showBoresight: boolean;
 
+  // Hypothetical Planet X direction on the sky at the selected timeline time
+  planetXMarker: { ra: number; dec: number; name: string } | null;
+  setPlanetXMarker: (m: { ra: number; dec: number; name: string } | null) => void;
+
   // Actions
   setViewMode: (mode: 'sky' | 'spacecraft') => void;
   setCoordinates: (ra: number, dec: number, presetName?: string) => void;
@@ -90,6 +94,9 @@ export const useSkyStore = create<SkyState>((set) => ({
   viewMode: 'sky',
   showSunExclusion: true,
   showBoresight: true,
+
+  planetXMarker: null,
+  setPlanetXMarker: (planetXMarker) => set({ planetXMarker }),
 
   setViewMode: (viewMode) => set({ viewMode }),
 

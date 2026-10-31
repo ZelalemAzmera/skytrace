@@ -90,7 +90,7 @@ export default function ControlToggles() {
   ];
 
   return (
-    <div className="absolute top-4 right-4 z-20 flex flex-col gap-2 pointer-events-auto">
+    <div className="absolute top-28 lg:top-16 right-4 z-20 flex flex-col gap-2 pointer-events-auto max-w-[calc(100vw-2rem)] max-h-[calc(100vh-8rem)] lg:max-h-[calc(100vh-5rem)] overflow-y-auto">
       {/* 1. Observation View Mode Switcher */}
       <div className="glass-panel p-2 backdrop-blur-md">
         <div className="text-[10px] font-mono uppercase tracking-wider text-[var(--text-muted)] mb-1.5 px-1">

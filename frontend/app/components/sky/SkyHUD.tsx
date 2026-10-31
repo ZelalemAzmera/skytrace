@@ -110,7 +110,7 @@ export default function SkyHUD() {
   };
 
   return (
-    <div className="absolute top-4 left-4 z-20 flex flex-col gap-3 pointer-events-none max-w-sm w-full">
+    <div className="absolute top-28 lg:top-16 left-4 z-20 flex flex-col gap-3 pointer-events-none max-w-sm w-[calc(100vw-2rem)] sm:w-full max-h-[calc(100vh-8rem)] lg:max-h-[calc(100vh-5rem)] overflow-y-auto pb-2">
       {/* Target Coordinates HUD */}
       <div className="glass-panel p-4 pointer-events-auto backdrop-blur-md">
         <div className="flex items-center justify-between mb-3 border-b border-[var(--border-subtle)] pb-2">
@@ -335,7 +335,9 @@ export default function SkyHUD() {
           </div>
           {hoveredObject.extra && (
             <div className="text-[11px] text-[var(--accent-gold)] font-mono mt-0.5">
-              {hoveredObject.extra}
+              {hoveredObject.extra.split(' | ').map((line, i) => (
+                <div key={i}>{line}</div>
+              ))}
             </div>
           )}
         </div>
