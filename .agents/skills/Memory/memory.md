@@ -479,3 +479,23 @@ Configured the codebase for Render deployment, committed/pushed configurations t
 3. Server Restoration:
    - Restarted FastAPI backend on `http://127.0.0.1:8000` (task-2922) and Next.js frontend on `http://localhost:3000` (task-2924); verified both healthy.
 ---
+
+---
+### Turn 32 - [2026-11-01 21:37:00]
+#### 👤 User Prompt:
+I use method B and i create a web service but i got a deployement failure "2026-11-01T18:22:24.013219531Z ... pydantic_settings.exceptions.SettingsError: error parsing value for field "allowed_origins" from source "EnvSettingsSource""
+
+#### 🤖 Agent Response:
+Diagnosed and resolved the Render deployment crash caused by Pydantic Settings attempting JSON parsing on comma-separated strings for ALLOWED_ORIGINS:
+1. Root Cause Identified:
+   - In Pydantic v2 / pydantic-settings, when a field is typed strictly as `list[str]`, `EnvSettingsSource` interprets it as a complex type and forces `json.loads()` on the raw environment variable string before field validators can run.
+   - Because Render environment variables are entered as comma-separated values (e.g. `https://skytrace-five.vercel.app,http://localhost:3000`), `json.loads` threw a `JSONDecodeError`, causing the Settings initialization failure.
+2. Fix Implemented in `backend/src/infrastructure/config.py`:
+   - Updated field signature to `allowed_origins: Union[list[str], str] = ["http://localhost:3000", "http://127.0.0.1:3000"]`.
+   - Enhanced the `@field_validator("allowed_origins", mode="after")` to parse both comma-separated strings and JSON arrays, strip whitespace, and normalize to clean `list[str]`.
+3. Verification & Deployment:
+   - Tested parsing with comma-separated strings, JSON arrays, single origins, and defaults.
+   - Ran all 18 backend pytest unit & integration tests (100% pass rate).
+   - Committed and pushed commit `c443a1e` to GitHub `origin/main`.
+   - Render will auto-deploy the new commit (or user can trigger "Manual Deploy" -> "Deploy latest commit").
+---
