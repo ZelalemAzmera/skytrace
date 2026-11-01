@@ -21,6 +21,30 @@ interface CelestialSphereProps {
   className?: string;
 }
 
+function createSunCoronaTexture(): THREE.Texture {
+  if (typeof document === 'undefined') {
+    return new THREE.Texture();
+  }
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 512;
+  const ctx = canvas.getContext('2d');
+  if (ctx) {
+    const gradient = ctx.createRadialGradient(256, 256, 0, 256, 256, 256);
+    gradient.addColorStop(0.0, 'rgba(255, 255, 250, 1.0)');
+    gradient.addColorStop(0.12, 'rgba(255, 240, 160, 0.95)');
+    gradient.addColorStop(0.28, 'rgba(255, 170, 50, 0.65)');
+    gradient.addColorStop(0.55, 'rgba(255, 95, 15, 0.22)');
+    gradient.addColorStop(0.80, 'rgba(255, 50, 5, 0.06)');
+    gradient.addColorStop(1.0, 'rgba(0, 0, 0, 0.0)');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, 512, 512);
+  }
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.needsUpdate = true;
+  return texture;
+}
+
 export default function CelestialSphere({ onCoordinateClick, className }: CelestialSphereProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const {
@@ -120,6 +144,26 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
     controls.autoRotate = autoRotate;
     controls.autoRotateSpeed = 0.35;
 
+    // --- 1.4 Solar System Scope High-Resolution Textures ---
+    const textureLoader = new THREE.TextureLoader();
+    const planetTextures: Record<string, THREE.Texture> = {
+      Sun: textureLoader.load('/textures/planets/sun.jpg'),
+      Mercury: textureLoader.load('/textures/planets/mercury.jpg'),
+      Venus: textureLoader.load('/textures/planets/venus.jpg'),
+      Earth: textureLoader.load('/textures/planets/earth.jpg'),
+      Mars: textureLoader.load('/textures/planets/mars.jpg'),
+      Jupiter: textureLoader.load('/textures/planets/jupiter.jpg'),
+      Saturn: textureLoader.load('/textures/planets/saturn.jpg'),
+      Uranus: textureLoader.load('/textures/planets/uranus.jpg'),
+      Neptune: textureLoader.load('/textures/planets/neptune.jpg'),
+      Moon: textureLoader.load('/textures/planets/moon.jpg'),
+    };
+    const earthCloudsTexture = textureLoader.load('/textures/planets/earth_clouds.jpg');
+    const saturnRingTexture = textureLoader.load('/textures/planets/saturn_ring.png');
+    const milkyWayTexture = textureLoader.load('/textures/planets/stars_milky_way.jpg');
+
+
+
     // --- 1.5 Vacuum PBR Space Lighting ---
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
     scene.add(ambientLight);
@@ -132,15 +176,14 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
     earthShineLight.position.set(-60, -30, -80);
     scene.add(earthShineLight);
 
-    // --- 2. Celestial Sphere Mesh ---
+    // --- 2. Celestial Sphere Mesh with Solar System Scope Milky Way ---
     const sphereRadius = 100;
     const sphereGeo = new THREE.SphereGeometry(sphereRadius, 64, 48);
     const sphereMat = new THREE.MeshBasicMaterial({
-      color: 0x050c1e,
+      map: milkyWayTexture,
       side: THREE.BackSide,
       transparent: true,
-      opacity: 0.18,
-      wireframe: false,
+      opacity: 0.42,
     });
     const sphereMesh = new THREE.Mesh(sphereGeo, sphereMat);
     scene.add(sphereMesh);
@@ -222,21 +265,32 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
     earthOrbitGroup.position.set(0, -22, 0);
     scene.add(earthOrbitGroup);
 
-    const earthGeo = new THREE.SphereGeometry(15, 48, 36);
+    const earthGeo = new THREE.SphereGeometry(15, 64, 48);
     const earthMat = new THREE.MeshStandardMaterial({
-      color: 0x1b4965,
-      roughness: 0.7,
-      metalness: 0.1,
+      map: planetTextures.Earth,
+      roughness: 0.65,
+      metalness: 0.05,
     });
     const earthMesh = new THREE.Mesh(earthGeo, earthMat);
     earthOrbitGroup.add(earthMesh);
 
-    // Atmosphere Glow Limb
-    const atmoGeo = new THREE.SphereGeometry(15.4, 48, 36);
-    const atmoMat = new THREE.MeshBasicMaterial({
-      color: 0x48cae4,
+    // Realistic Cloud Layer drifting above continents
+    const atmoCloudsGeo = new THREE.SphereGeometry(15.18, 64, 48);
+    const atmoCloudsMat = new THREE.MeshStandardMaterial({
+      map: earthCloudsTexture,
       transparent: true,
-      opacity: 0.2,
+      opacity: 0.72,
+      blending: THREE.AdditiveBlending,
+    });
+    const atmoCloudsMesh = new THREE.Mesh(atmoCloudsGeo, atmoCloudsMat);
+    earthOrbitGroup.add(atmoCloudsMesh);
+
+    // Atmosphere Glow Limb
+    const atmoGeo = new THREE.SphereGeometry(15.45, 64, 48);
+    const atmoMat = new THREE.MeshBasicMaterial({
+      color: 0x38bdf8,
+      transparent: true,
+      opacity: 0.28,
       side: THREE.BackSide,
       blending: THREE.AdditiveBlending,
     });
@@ -512,38 +566,128 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
     scanRing.rotation.x = Math.PI / 2.2;
     scanGroup.add(scanRing);
 
-    // --- 7. Solar System Orrery (Kepler Orbits & Planets) ---
+    // --- 7. Solar System Orrery (Kepler Orbits & Solar System Scope Photorealistic Planets) ---
     const orreryGroup = new THREE.Group();
     scene.add(orreryGroup);
 
-    // Central Sun
-    const sunGeo = new THREE.SphereGeometry(1.2, 16, 16);
-    const sunMat = new THREE.MeshBasicMaterial({ color: 0xfff07c });
+    // Central Photorealistic Sun with Luminous Dynamic Corona
+    const sunGeo = new THREE.SphereGeometry(2.0, 48, 48);
+    const sunMat = new THREE.MeshBasicMaterial({
+      map: planetTextures.Sun,
+    });
     const sunMesh = new THREE.Mesh(sunGeo, sunMat);
     orreryGroup.add(sunMesh);
 
-    // Planetary orbit lines and planet meshes
-    const planetMeshes: { mesh: THREE.Mesh; orbit: (typeof PLANET_ORBITS)[0] }[] = [];
+    // Corona flare sprites
+    const coronaTex = createSunCoronaTexture();
+    const innerCoronaMat = new THREE.SpriteMaterial({
+      map: coronaTex,
+      color: 0xfff6cf,
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      opacity: 0.9,
+    });
+    const innerCorona = new THREE.Sprite(innerCoronaMat);
+    innerCorona.scale.set(7.5, 7.5, 1.0);
+    sunMesh.add(innerCorona);
+
+    const outerCoronaMat = new THREE.SpriteMaterial({
+      map: coronaTex,
+      color: 0xff9922,
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      opacity: 0.45,
+    });
+    const outerCorona = new THREE.Sprite(outerCoronaMat);
+    outerCorona.scale.set(19.0, 19.0, 1.0);
+    sunMesh.add(outerCorona);
+
+    // Central PointLight casting authentic solar illumination onto planetary bodies
+    const sunLight = new THREE.PointLight(0xfff6e5, 3.8, 500, 0.4);
+    sunLight.position.set(0, 0, 0);
+    orreryGroup.add(sunLight);
+
+    const ORRERY_SCALE = 4.8;
+
+    // Planetary orbit lines and realistic textured planet meshes
+    interface PlanetMeshEntry {
+      mesh: THREE.Mesh;
+      orbit: (typeof PLANET_ORBITS)[0];
+      clouds?: THREE.Mesh;
+      rings?: THREE.Mesh;
+    }
+    const planetMeshes: PlanetMeshEntry[] = [];
+
     PLANET_ORBITS.forEach((orbit) => {
       const pts: THREE.Vector3[] = [];
-      for (let m = 0; m <= 360; m += 4) {
+      for (let m = 0; m <= 360; m += 3) {
         pts.push(
-          keplerToCartesian(orbit.a, orbit.e, orbit.i, orbit.omega, orbit.Omega, m, 6.0)
+          keplerToCartesian(orbit.a, orbit.e, orbit.i, orbit.omega, orbit.Omega, m, ORRERY_SCALE)
         );
       }
       const oGeo = new THREE.BufferGeometry().setFromPoints(pts);
       const oMat = new THREE.LineBasicMaterial({
         color: orbit.color,
         transparent: true,
-        opacity: 0.25,
+        opacity: 0.28,
       });
       orreryGroup.add(new THREE.Line(oGeo, oMat));
 
-      const pGeo = new THREE.SphereGeometry(orbit.size * 0.45, 12, 12);
-      const pMat = new THREE.MeshBasicMaterial({ color: orbit.color });
+      const pGeo = new THREE.SphereGeometry(orbit.size * 0.65, 32, 32);
+      const tex = planetTextures[orbit.name] || planetTextures.Mercury;
+      const pMat = new THREE.MeshStandardMaterial({
+        map: tex,
+        roughness: orbit.name === 'Earth' ? 0.6 : 0.75,
+        metalness: 0.05,
+      });
       const pMesh = new THREE.Mesh(pGeo, pMat);
       orreryGroup.add(pMesh);
-      planetMeshes.push({ mesh: pMesh, orbit });
+
+      let pClouds: THREE.Mesh | undefined;
+      let pRings: THREE.Mesh | undefined;
+
+      // Realistic Earth clouds in Orrery
+      if (orbit.name === 'Earth') {
+        const cGeo = new THREE.SphereGeometry(orbit.size * 0.665, 32, 32);
+        const cMat = new THREE.MeshStandardMaterial({
+          map: earthCloudsTexture,
+          transparent: true,
+          opacity: 0.75,
+          blending: THREE.NormalBlending,
+        });
+        pClouds = new THREE.Mesh(cGeo, cMat);
+        pMesh.add(pClouds);
+      }
+
+      // Realistic 3D Saturn Rings with custom radial UV projection
+      if (orbit.name === 'Saturn') {
+        const ringInner = orbit.size * 0.85;
+        const ringOuter = orbit.size * 1.95;
+        const ringGeo = new THREE.RingGeometry(ringInner, ringOuter, 64);
+        const posAttr = ringGeo.attributes.position;
+        const uvAttr = ringGeo.attributes.uv;
+        for (let i = 0; i < posAttr.count; i++) {
+          const x = posAttr.getX(i);
+          const y = posAttr.getY(i);
+          const r = Math.sqrt(x * x + y * y);
+          const normalizedR = (r - ringInner) / (ringOuter - ringInner);
+          uvAttr.setXY(i, normalizedR, 0.5);
+        }
+        uvAttr.needsUpdate = true;
+
+        const ringMat = new THREE.MeshStandardMaterial({
+          map: saturnRingTexture,
+          side: THREE.DoubleSide,
+          transparent: true,
+          opacity: 0.95,
+          roughness: 0.6,
+        });
+        pRings = new THREE.Mesh(ringGeo, ringMat);
+        pRings.rotation.x = Math.PI / 2 + 0.466; // 26.73 deg axial tilt
+        pMesh.add(pRings);
+      }
+
+      planetMeshes.push({ mesh: pMesh, orbit, clouds: pClouds, rings: pRings });
     });
 
     // --- 8. Selected Target Reticle & Candidate Markers ---
@@ -629,11 +773,11 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
           const sx = ((ndc.x + 1) / 2) * rect.width;
           const sy = ((1 - ndc.y) / 2) * rect.height;
           const d = Math.hypot(sx - px, sy - py);
-          if (d < 16 && (!best || d < best.d)) best = { d, mesh, orbit };
+          if (d < 18 && (!best || d < best.d)) best = { d, mesh, orbit };
         });
         if (best) {
           const { mesh, orbit } = best as { d: number; mesh: THREE.Mesh; orbit: (typeof PLANET_ORBITS)[0] };
-          const rAu = mesh.position.length() / 6.0; // scene units -> AU (orrery scale = 6)
+          const rAu = mesh.position.length() / ORRERY_SCALE;
           // vis-viva: v = 29.7847 km/s * sqrt(2/r - 1/a)  (1 AU circular speed)
           const vKms = 29.7847 * Math.sqrt(Math.max(0, 2 / rAu - 1 / orbit.a));
           const when = new Date().toISOString().replace('T', ' ').slice(0, 19) + ' UTC';
@@ -781,8 +925,14 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
       scanGroup.visible = storeValuesRef.current.showScanPath;
 
       if (isSpacecraftMode) {
-        earthOrbitGroup.rotation.y = elapsed * 0.02;
+        earthMesh.rotation.y = elapsed * 0.012;
+        atmoCloudsMesh.rotation.y = elapsed * 0.016;
       }
+
+      // Rotate Sun and solar corona
+      sunMesh.rotation.y = elapsed * 0.03;
+      innerCorona.material.rotation = elapsed * 0.012;
+      outerCorona.material.rotation = -elapsed * 0.008;
 
       // Rotate SPHEREx scan ring
       if (storeValuesRef.current.showScanPath) {
@@ -792,7 +942,7 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
       // Update Planet positions via Kepler solver
       if (storeValuesRef.current.showOrrery) {
         const jd = getJulianDate();
-        planetMeshes.forEach(({ mesh, orbit }) => {
+        planetMeshes.forEach(({ mesh, orbit, clouds }) => {
           // Mean anomaly rate (deg/day)
           const mDeg = ((jd - 2451545.0) * (360.0 / orbit.periodDays)) % 360;
           const pos = keplerToCartesian(
@@ -802,9 +952,13 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
             orbit.omega,
             orbit.Omega,
             mDeg,
-            6.0
+            ORRERY_SCALE
           );
           mesh.position.copy(pos);
+          mesh.rotation.y = elapsed * 0.4;
+          if (clouds) {
+            clouds.rotation.y = elapsed * 0.48;
+          }
         });
       }
 

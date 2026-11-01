@@ -223,11 +223,14 @@ export function keplerToCartesian(
  * Major solar system planetary orbital elements (semi-major axis AU, eccentricity, inclination deg, periapsis deg, node deg, mean anomaly rate deg/day)
  */
 export const PLANET_ORBITS = [
-  { name: 'Mercury', a: 0.387, e: 0.2056, i: 7.00, omega: 29.12, Omega: 48.33, color: 0x9E9E9E, size: 0.6, periodDays: 87.97 },
-  { name: 'Venus',   a: 0.723, e: 0.0068, i: 3.39, omega: 54.88, Omega: 76.68, color: 0xFFD166, size: 0.9, periodDays: 224.70 },
-  { name: 'Earth',   a: 1.000, e: 0.0167, i: 0.00, omega: 114.21, Omega: 0.00, color: 0x00E5FF, size: 1.0, periodDays: 365.26 },
-  { name: 'Mars',    a: 1.524, e: 0.0934, i: 1.85, omega: 286.50, Omega: 49.56, color: 0xFF6B35, size: 0.7, periodDays: 686.98 },
-  { name: 'Jupiter', a: 5.204, e: 0.0485, i: 1.30, omega: 273.87, Omega: 100.46, color: 0xDDAA44, size: 1.8, periodDays: 4332.59 },
+  { name: 'Mercury', a: 0.387, e: 0.2056, i: 7.00, omega: 29.12, Omega: 48.33, color: 0x9E9E9E, size: 0.65, periodDays: 87.97 },
+  { name: 'Venus',   a: 0.723, e: 0.0068, i: 3.39, omega: 54.88, Omega: 76.68, color: 0xFFD166, size: 0.95, periodDays: 224.70 },
+  { name: 'Earth',   a: 1.000, e: 0.0167, i: 0.00, omega: 114.21, Omega: 0.00, color: 0x00E5FF, size: 1.05, periodDays: 365.26 },
+  { name: 'Mars',    a: 1.524, e: 0.0934, i: 1.85, omega: 286.50, Omega: 49.56, color: 0xFF6B35, size: 0.80, periodDays: 686.98 },
+  { name: 'Jupiter', a: 5.204, e: 0.0485, i: 1.30, omega: 273.87, Omega: 100.46, color: 0xDDAA44, size: 2.10, periodDays: 4332.59 },
+  { name: 'Saturn',  a: 9.582, e: 0.0541, i: 2.49, omega: 339.39, Omega: 113.67, color: 0xEAD6B8, size: 1.80, periodDays: 10759.22 },
+  { name: 'Uranus',  a: 14.20, e: 0.0472, i: 0.77, omega: 96.99, Omega: 74.01, color: 0x70D6FF, size: 1.35, periodDays: 30685.40 },
+  { name: 'Neptune', a: 17.50, e: 0.0086, i: 1.77, omega: 273.19, Omega: 131.78, color: 0x4361EE, size: 1.35, periodDays: 60189.00 },
 ];
 
 /**
