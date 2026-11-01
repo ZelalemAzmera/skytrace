@@ -427,3 +427,33 @@ Restarted and verified both SkyTrace servers as background daemons:
    - Frontend UI: `http://localhost:3000` (includes 3D Celestial Explorer `/explore` with NASA Spitzer model and Blink Comparator `/compare`).
    - Backend API & Interactive Docs: `http://127.0.0.1:8000/docs`.
 ---
+
+
+### Turn 30 - [2026-11-01 17:20:00]
+#### 👤 User Prompt:
+On spacecraft view mode, fix the lines cuz it is an awfull ui, and also change the telescope to "speherex" and also the eexact position and 3d model. So plan it through and do it
+[Attachment: media_1793531427975_068234ea.jpg showing https://skytrace-five.vercel.app/explore with Spitzer 3D model, clipping Sun sphere, and 32 radial wireframe lines intersecting the spacecraft]
+
+#### 🤖 Agent Response:
+Planned, implemented, verified, and deployed the authentic NASA SPHEREx 3D Observatory model and eliminated all UI line clutter across local and live Vercel deployments:
+1. NASA SPHEREx 3D Asset Reverse Engineering & Integration:
+   - Reverse-engineered NASA Eyes on the Solar System asset pipeline (`https://eyes.nasa.gov/apps/solar-system/app.js` -> `models/sc_spherex/spherex.gltf`).
+   - Downloaded and verified all 9 model geometry, normal, albedo, and PBR assets into `frontend/public/models/spherex/` (`spherex.gltf`, `spherex.bin`, `spherex_normals.webp`, `spherex_albedo_webp.webp`, `spherex_pbr.webp`, plus converted JPEG normal map fallbacks).
+2. Elimination of Awful Lines & Spacecraft View Clean-up:
+   - Sun Exclusion Cone: Removed 32-line wireframe cone intersecting the spacecraft; replaced with a smooth, soft translucent amber frustum volume (opacity: 0.08) strictly beginning at radius r >= 20 (completely clearing the spacecraft envelope).
+   - Orrery Clipping: Hidden the Orrery central Sun ball and Keplerian planetary orbit lines when in Spacecraft mode (`orreryGroup.visible = storeValuesRef.current.showOrrery && !isSpacecraftMode;`) so they never intersect the telescope.
+   - Reticle & Target Rings: Suppressed celestial target circles in Spacecraft mode to keep the CAD model unobstructed.
+   - Boresight Laser Ray: Updated aperture emitter to +Y aperture opening (`y = 1.15`) with a glowing cyan emission ring.
+3. Authentic Orbit & Geometry Physics:
+   - Modeled SPHEREx orientation: +Y aperture points toward target coordinates, +X faces Sun (solar array), and -Y points toward Earth nadir.
+   - Added Low Earth Orbit (LEO) background with curved Earth globe and glowing cyan atmospheric limb at (0, -22, 0).
+   - Configured camera OrbitControls with smooth lerping to (4.8, 3.8, 5.8) framing the telescope prominently.
+4. UI & HUD Telemetry Synchronization:
+   - Updated `SkyHUD.tsx` card title to `SPHEREx Spacecraft CTA`, badge to `LEO Orbit`, `Cryo Assembly: < 80K V-Groove`, and `700 km Polar LEO`.
+   - Renamed view mode toggle button to `SPHEREx` in `ControlToggles.tsx`.
+5. Testing, Production Verification & Live Vercel Deployment:
+   - Executed automated test suite `frontend/test_phase7_spherex_model.mjs`: All 9 tests passed.
+   - Built optimized production Next.js bundle (`npm run build`) with 0 errors.
+   - Pushed commit `78930ec` to remote GitHub repository (`https://github.com/ZelalemAzmera/skytrace.git`).
+   - Verified live Vercel deployment at `https://skytrace-five.vercel.app/explore` via automated Playwright visual testing: confirmed SPHEREx 3D observatory model, clean UI, no intersecting lines, and LEO atmosphere live in production.
+---
