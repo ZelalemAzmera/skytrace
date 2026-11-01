@@ -457,3 +457,25 @@ Planned, implemented, verified, and deployed the authentic NASA SPHEREx 3D Obser
    - Pushed commit `78930ec` to remote GitHub repository (`https://github.com/ZelalemAzmera/skytrace.git`).
    - Verified live Vercel deployment at `https://skytrace-five.vercel.app/explore` via automated Playwright visual testing: confirmed SPHEREx 3D observatory model, clean UI, no intersecting lines, and LEO atmosphere live in production.
 ---
+
+---
+### Turn 31 - [2026-11-01 20:30:00]
+#### 👤 User Prompt:
+Tell me how to deploy the backend to render and connect it to the front end
+
+#### 🤖 Agent Response:
+Configured the codebase for Render deployment, committed/pushed configurations to GitHub, verified tests, and provided complete step-by-step instructions for deploying to Render and connecting to the Vercel frontend:
+1. Render Deployment Infrastructure Configured:
+   - Created `render.yaml` Blueprint at root: defines `skytrace-backend` Web Service with Python 3.12.3 runtime, rootDir `backend`, build command `pip install -r requirements.txt`, start command `uvicorn main:app --host 0.0.0.0 --port $PORT`, health check `/health`, and pre-configured environment variables (`PYTHON_VERSION`, `ALLOWED_ORIGINS`, `DATABASE_URL`, `LOG_LEVEL`).
+   - Optimized `backend/Dockerfile` to use fast `uv pip install --system -r requirements.txt` with proper layer caching and `PORT` environment mapping.
+   - Created `backend/.python-version` (`3.12.3`), `backend/runtime.txt` (`python-3.12.3`), and `backend/README.md`.
+   - Verified all 18 backend pytest tests pass (100% pass rate).
+   - Committed and pushed commit `afb6a04` to GitHub `origin/main`.
+2. Documented Step-by-Step Deployment Guide:
+   - Method A (1-Click Blueprint): Connect GitHub repo on Render -> select `render.yaml` Blueprint -> Deploy.
+   - Method B (Manual Web Service): Set Root Directory `backend`, Runtime `Python 3`, Build Command `pip install -r requirements.txt`, Start Command `uvicorn main:app --host 0.0.0.0 --port $PORT`.
+   - Connecting Frontend on Vercel: Set `NEXT_PUBLIC_API_URL = https://<your-service>.onrender.com` in Vercel project environment variables and redeploy.
+   - Verification: Confirmed health checks on `/health` and live data pipeline on `/explore`.
+3. Server Restoration:
+   - Restarted FastAPI backend on `http://127.0.0.1:8000` (task-2922) and Next.js frontend on `http://localhost:3000` (task-2924); verified both healthy.
+---
