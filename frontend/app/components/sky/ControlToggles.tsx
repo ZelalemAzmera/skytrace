@@ -117,7 +117,7 @@ export default function ControlToggles() {
             }`}
           >
             <Telescope className="w-3.5 h-3.5" />
-            <span>Spacecraft</span>
+            <span>SPHEREx</span>
           </button>
         </div>
       </div>

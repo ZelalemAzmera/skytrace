@@ -145,16 +145,15 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
     const sphereMesh = new THREE.Mesh(sphereGeo, sphereMat);
     scene.add(sphereMesh);
 
-    // --- 2.5 Authentic NASA Spitzer 3D Spacecraft & Boresight Ray ---
+    // --- 2.5 Authentic NASA SPHEREx 3D Observatory & Boresight Ray ---
     const spacecraftGroup = new THREE.Group();
     spacecraftGroup.visible = false; // hidden until Spacecraft mode is selected
     scene.add(spacecraftGroup);
 
-    // Boresight line-of-sight laser ray along +Z (aperture vector)
+    // Boresight line-of-sight laser ray along +Y (SPHEREx telescope aperture axis)
     const rayLength = sphereRadius * 0.985;
-    const rayGeo = new THREE.CylinderGeometry(0.06, 0.3, rayLength, 8);
+    const rayGeo = new THREE.CylinderGeometry(0.04, 0.22, rayLength, 12);
     rayGeo.translate(0, rayLength / 2, 0);
-    rayGeo.rotateX(Math.PI / 2);
     const rayMat = new THREE.MeshBasicMaterial({
       color: 0x00e5ff,
       transparent: true,
@@ -163,19 +162,38 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
       depthWrite: false,
     });
     const boresightRay = new THREE.Mesh(rayGeo, rayMat);
+    boresightRay.position.set(0, 1.15, 0);
     spacecraftGroup.add(boresightRay);
 
-    // 85° Solar Exclusion Cone (Cryogenic Thermal Limit)
-    // Points toward directional sunlight vector
+    // Sleek Aperture Emitter Ring at top rim of V-groove shield
+    const emitGeo = new THREE.RingGeometry(0.35, 0.55, 32);
+    const emitMat = new THREE.MeshBasicMaterial({
+      color: 0x00e5ff,
+      transparent: true,
+      opacity: 0.85,
+      side: THREE.DoubleSide,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    });
+    const emitMesh = new THREE.Mesh(emitGeo, emitMat);
+    emitMesh.rotation.x = Math.PI / 2;
+    emitMesh.position.set(0, 1.15, 0);
+    spacecraftGroup.add(emitMesh);
+
+    // 85° Solar Exclusion Cone (Cryogenic Thermal Avoidance Frustum)
+    // Points toward directional sunlight vector, truncated at r=20 to completely avoid intersecting the spacecraft!
     const sunVector = new THREE.Vector3(80, 50, 100).normalize();
-    const coneGeo = new THREE.ConeGeometry(55, 65, 32, 1, true);
-    coneGeo.translate(0, -32.5, 0);
+    const coneLength = 75;
+    const rInner = 20 * Math.tan((85 * Math.PI) / 360);
+    const rOuter = 95 * Math.tan((85 * Math.PI) / 360);
+    const coneGeo = new THREE.CylinderGeometry(rInner, rOuter, coneLength, 48, 1, true);
+    coneGeo.translate(0, -coneLength / 2 - 20, 0);
     coneGeo.rotateX(Math.PI / 2);
     const coneMat = new THREE.MeshBasicMaterial({
-      color: 0xff9900,
+      color: 0xff8c00,
       transparent: true,
-      opacity: 0.12,
-      wireframe: true,
+      opacity: 0.08,
+      wireframe: false,
       side: THREE.DoubleSide,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
@@ -185,27 +203,67 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
     sunExclusionCone.visible = false;
     scene.add(sunExclusionCone);
 
-    // Load NASA Spitzer GLTF Model
+    // Glowing boundary rim ring at r=95 on celestial sphere
+    const rimGeo = new THREE.RingGeometry(rOuter - 0.25, rOuter + 0.25, 64);
+    const rimMat = new THREE.MeshBasicMaterial({
+      color: 0xffaa00,
+      transparent: true,
+      opacity: 0.35,
+      side: THREE.DoubleSide,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    });
+    const rimMesh = new THREE.Mesh(rimGeo, rimMat);
+    rimMesh.position.set(0, 0, -coneLength - 20);
+    sunExclusionCone.add(rimMesh);
+
+    // Low Earth Orbit Environment (Earth Globe beneath SPHEREx in Spacecraft View Mode)
+    const earthOrbitGroup = new THREE.Group();
+    earthOrbitGroup.position.set(0, -22, 0);
+    scene.add(earthOrbitGroup);
+
+    const earthGeo = new THREE.SphereGeometry(15, 48, 36);
+    const earthMat = new THREE.MeshStandardMaterial({
+      color: 0x1b4965,
+      roughness: 0.7,
+      metalness: 0.1,
+    });
+    const earthMesh = new THREE.Mesh(earthGeo, earthMat);
+    earthOrbitGroup.add(earthMesh);
+
+    // Atmosphere Glow Limb
+    const atmoGeo = new THREE.SphereGeometry(15.4, 48, 36);
+    const atmoMat = new THREE.MeshBasicMaterial({
+      color: 0x48cae4,
+      transparent: true,
+      opacity: 0.2,
+      side: THREE.BackSide,
+      blending: THREE.AdditiveBlending,
+    });
+    const atmoMesh = new THREE.Mesh(atmoGeo, atmoMat);
+    earthOrbitGroup.add(atmoMesh);
+
+    // Load NASA SPHEREx GLTF Model
     const gltfLoader = new GLTFLoader();
     gltfLoader.load(
-      '/models/spitzer/SPITZER.gltf',
+      '/models/spherex/spherex.gltf',
       (gltf) => {
         const model = gltf.scene;
-        model.scale.set(1.4, 1.4, 1.4);
+        model.scale.set(2.4, 2.4, 2.4);
         model.traverse((child) => {
           if ((child as THREE.Mesh).isMesh) {
             const m = child as THREE.Mesh;
             if (m.material) {
               const mat = m.material as THREE.MeshStandardMaterial;
-              mat.roughness = 0.35;
-              mat.metalness = 0.85;
+              mat.roughness = 0.32;
+              mat.metalness = 0.78;
             }
           }
         });
         spacecraftGroup.add(model);
       },
       undefined,
-      (err) => console.warn('NASA Spitzer GLTF model load error:', err)
+      (err) => console.warn('NASA SPHEREx GLTF model load error:', err)
     );
 
     // --- 3. Milky Way Great Circle Dust Band ---
@@ -711,11 +769,20 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
       controls.update();
 
       // Visibility toggles from store
+      const isSpacecraftMode = storeValuesRef.current.viewMode === 'spacecraft';
+      spacecraftGroup.visible = isSpacecraftMode;
+      spacecraftGroup.position.set(0, 0, 0);
       gridGroup.visible = storeValuesRef.current.showEquatorialGrid;
       eclipticGroup.visible = storeValuesRef.current.showEclipticGrid;
       galacticGroup.visible = storeValuesRef.current.showGalacticPlane;
-      orreryGroup.visible = storeValuesRef.current.showOrrery;
+      // In Spacecraft View Mode: Hide intersecting central orrery (Sun & inner orbits) so they never clip through the spacecraft!
+      orreryGroup.visible = storeValuesRef.current.showOrrery && !isSpacecraftMode;
+      earthOrbitGroup.visible = isSpacecraftMode;
       scanGroup.visible = storeValuesRef.current.showScanPath;
+
+      if (isSpacecraftMode) {
+        earthOrbitGroup.rotation.y = elapsed * 0.02;
+      }
 
       // Rotate SPHEREx scan ring
       if (storeValuesRef.current.showScanPath) {
@@ -749,6 +816,7 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
       );
       targetGroup.position.copy(targetPos);
       targetGroup.lookAt(new THREE.Vector3(0, 0, 0));
+      targetGroup.visible = !isSpacecraftMode;
 
       // Planet X sky marker
       const pxm = storeValuesRef.current.planetXMarker;
@@ -758,41 +826,29 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
         planetXGroup.lookAt(new THREE.Vector3(0, 0, 0));
       }
 
-      // --- Spacecraft Slew: Smoothly rotate model along +Z aperture to point at target RA/Dec ---
+      // --- Spacecraft Slew: Smoothly rotate SPHEREx along +Y aperture to point at target RA/Dec ---
       const targetDir = icrsToUnitVector(
         storeValuesRef.current.ra,
         storeValuesRef.current.dec,
         1.0
       ).normalize();
-      const modelAperture = new THREE.Vector3(0, 0, 1);
+      const modelAperture = new THREE.Vector3(0, 1, 0); // SPHEREx conical aperture points along +Y
       const targetQuat = new THREE.Quaternion().setFromUnitVectors(modelAperture, targetDir);
       spacecraftGroup.quaternion.slerp(targetQuat, 0.06);
 
-      // Spacecraft is hidden until selected; when active it orbits Earth and the camera follows it
-      const isSc = storeValuesRef.current.viewMode === 'spacecraft';
-      spacecraftGroup.visible = isSc;
-      boresightRay.visible = isSc && storeValuesRef.current.showBoresight;
-      sunExclusionCone.visible = isSc && storeValuesRef.current.showSunExclusion;
-      const earthEntry = planetMeshes.find((p) => p.orbit.name === 'Earth');
-      if (earthEntry) {
-        spacecraftGroup.position.copy(earthEntry.mesh.position);
-        sunExclusionCone.position.copy(earthEntry.mesh.position);
-      }
+      // Toggles for Boresight and Sun Exclusion Zone
+      boresightRay.visible = storeValuesRef.current.showBoresight;
+      emitMesh.visible = storeValuesRef.current.showBoresight;
+      sunExclusionCone.visible = storeValuesRef.current.showSunExclusion;
 
-      // View mode transitions: camera is moved once on a mode change, then zoom is free
-      if (lastViewMode !== storeValuesRef.current.viewMode) {
-        lastViewMode = storeValuesRef.current.viewMode;
-        transitionFrames = 90;
-      }
-      if (isSc) {
-        controls.minDistance = 2;
-        controls.maxDistance = 65;
-        const sc = spacecraftGroup.position;
-        if (transitionFrames > 0) {
-          camera.position.lerp(sc.clone().add(new THREE.Vector3(12, 12, 20)), 0.06);
-          transitionFrames--;
+      // View Mode Transitions: Sky Survey (wide) vs Spacecraft (close-up orbiting telescope)
+      if (isSpacecraftMode) {
+        controls.minDistance = 2.0;
+        controls.maxDistance = 35;
+        if (camera.position.length() > 16) {
+          camera.position.lerp(new THREE.Vector3(4.5, 3.2, 5.5), 0.06);
         }
-        controls.target.lerp(sc, 0.1); // zoom toward the satellite
+        controls.target.lerp(new THREE.Vector3(0, 0.2, 0), 0.06);
       } else {
         controls.minDistance = 0.5; // no hard cap: can zoom right in on the Sun / planets
         controls.maxDistance = 320;
@@ -800,8 +856,9 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
           camera.position.lerp(new THREE.Vector3(0, 30, 160), 0.06);
           transitionFrames--;
         }
-        controls.target.lerp(new THREE.Vector3(0, 0, 0), 0.1); // zoom toward the Sun
+        controls.target.lerp(new THREE.Vector3(0, 0, 0), 0.1);
       }
+
 
       // Pulse reticle
       const scale1 = 1.0 + Math.sin(elapsed * 3) * 0.08;
@@ -850,8 +907,16 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
       ring2Mat.dispose();
       rayGeo.dispose();
       rayMat.dispose();
+      emitGeo.dispose();
+      emitMat.dispose();
       coneGeo.dispose();
       coneMat.dispose();
+      rimGeo.dispose();
+      rimMat.dispose();
+      earthGeo.dispose();
+      earthMat.dispose();
+      atmoGeo.dispose();
+      atmoMat.dispose();
 
       if (container.contains(renderer.domElement)) {
         container.removeChild(renderer.domElement);

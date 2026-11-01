@@ -409,3 +409,21 @@ Planned, implemented, tested phase by phase, and visually verified the Dual View
    - Executed browser visual validation across both modes: verified mode switching, realistic gold foil rendering, slewing toward Orion/Crab Nebula presets, and camera transitions.
    - Committed changes and pushed to remote GitHub repository (`https://github.com/ZelalemAzmera/skytrace.git`).
 ---
+
+
+### Turn 29 - [2026-11-01 13:14:00]
+#### 👤 User Prompt:
+start the servers
+
+#### 🤖 Agent Response:
+Restarted and verified both SkyTrace servers as background daemons:
+1. Backend Daemon (`task-2337`):
+   - Started FastAPI uvicorn server on `http://127.0.0.1:8000` via `.venv\Scripts\uvicorn.exe main:app --host 127.0.0.1 --port 8000`.
+   - Verified health status: `GET /health` returned `{"status":"ok","service":"skytrace-backend"}` (HTTP 200 OK).
+2. Frontend Daemon (`task-2343`):
+   - Started Next.js production server on `http://localhost:3000` via `npm start`.
+   - Verified response: `GET /` returned HTTP 200 OK (`Ready in 6.3s`).
+3. Services are live and accessible at:
+   - Frontend UI: `http://localhost:3000` (includes 3D Celestial Explorer `/explore` with NASA Spitzer model and Blink Comparator `/compare`).
+   - Backend API & Interactive Docs: `http://127.0.0.1:8000/docs`.
+---

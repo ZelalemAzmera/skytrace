@@ -277,7 +277,7 @@ export default function SkyHUD() {
         <div className="flex items-center justify-between pb-1.5 mb-2 border-b border-[var(--border-subtle)]">
           <div className="flex items-center gap-1.5 text-xs font-bold text-[var(--text-primary)]">
             <Telescope className="w-3.5 h-3.5 text-[var(--accent-cyan)]" />
-            <span>Spitzer Spacecraft CTA</span>
+            <span>SPHEREx Spacecraft CTA</span>
           </div>
           <span
             className={`text-[9px] font-mono px-1.5 py-0.5 rounded uppercase font-semibold ${
@@ -286,14 +286,14 @@ export default function SkyHUD() {
                 : 'bg-[rgba(0,229,255,0.1)] text-[var(--accent-cyan)] border border-[rgba(0,229,255,0.3)]'
             }`}
           >
-            {viewMode === 'spacecraft' ? 'Close Orbit' : 'Boresight Lock'}
+            {viewMode === 'spacecraft' ? 'LEO Orbit' : 'Boresight Lock'}
           </span>
         </div>
 
         <div className="grid grid-cols-2 gap-2 text-xs font-mono">
           <div>
             <div className="text-[10px] text-[var(--text-muted)]">Cryo Assembly</div>
-            <div className="text-[var(--text-primary)] font-semibold text-[11px]">1.4K L-He Dewar</div>
+            <div className="text-[var(--text-primary)] font-semibold text-[11px]">&lt; 80K V-Groove</div>
           </div>
           <div>
             <div className="text-[10px] text-[var(--text-muted)]">Solar Margin</div>
@@ -307,13 +307,13 @@ export default function SkyHUD() {
               ) : (
                 <ShieldAlert className="w-3 h-3 text-[var(--accent-orange)] animate-pulse" />
               )}
-              <span>{sunSepAngle.toFixed(1)}° ({isSunSafe ? 'Safe' : 'Limit'})</span>
+              <span>{sunSepAngle.toFixed(1)}° ({isSunSafe ? 'Nominal' : 'Limit'})</span>
             </div>
           </div>
         </div>
 
         <div className="mt-2 pt-1.5 border-t border-[var(--border-subtle)] text-[10px] font-mono flex items-center justify-between text-[var(--text-secondary)]">
-          <span>Target Alignment</span>
+          <span>700 km Polar LEO</span>
           <span className="text-[var(--accent-cyan)] font-semibold">
             {ra.toFixed(2)}°, {dec.toFixed(2)}°
           </span>
