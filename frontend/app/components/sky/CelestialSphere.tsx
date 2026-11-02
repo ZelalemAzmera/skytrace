@@ -49,6 +49,93 @@ function createSunCoronaTexture(): THREE.Texture {
   return texture;
 }
 
+// Solar System Scope Target HUD Billboard Label Generator
+function updateTargetBadgeCanvas(
+  canvas: HTMLCanvasElement,
+  targetTitle: string,
+  coordsText: string
+): void {
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  const w = canvas.width;
+  const h = canvas.height;
+
+  // Outer Holographic Glow Background
+  ctx.fillStyle = 'rgba(6, 12, 28, 0.92)';
+  ctx.strokeStyle = '#00e5ff';
+  ctx.lineWidth = 2.0;
+  ctx.beginPath();
+  if (ctx.roundRect) {
+    ctx.roundRect(14, 6, w - 28, h - 12, 8);
+  } else {
+    ctx.rect(14, 6, w - 28, h - 12);
+  }
+  ctx.fill();
+  ctx.stroke();
+
+  // Corner Accent Brackets
+  ctx.strokeStyle = '#38bdf8';
+  ctx.lineWidth = 3.0;
+  // Top-left
+  ctx.beginPath();
+  ctx.moveTo(16, 22);
+  ctx.lineTo(16, 8);
+  ctx.lineTo(30, 8);
+  ctx.stroke();
+  // Top-right
+  ctx.beginPath();
+  ctx.moveTo(w - 16, 22);
+  ctx.lineTo(w - 16, 8);
+  ctx.lineTo(w - 30, 8);
+  ctx.stroke();
+  // Bottom-left
+  ctx.beginPath();
+  ctx.moveTo(16, h - 22);
+  ctx.lineTo(16, h - 8);
+  ctx.lineTo(30, h - 8);
+  ctx.stroke();
+  // Bottom-right
+  ctx.beginPath();
+  ctx.moveTo(w - 16, h - 22);
+  ctx.lineTo(w - 16, h - 8);
+  ctx.lineTo(w - 30, h - 8);
+  ctx.stroke();
+
+  // Target Title
+  ctx.font = 'bold 30px system-ui, -apple-system, sans-serif';
+  ctx.fillStyle = '#00f0ff';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(targetTitle.toUpperCase(), w / 2, 40);
+
+  // Subtext Coordinates
+  ctx.font = 'bold 20px monospace';
+  ctx.fillStyle = '#38bdf8';
+  ctx.fillText(coordsText, w / 2, 78);
+  ctx.fillText(coordsText, w / 2, 78);
+}
+
+function createTargetBadgeTexture(
+  targetTitle: string,
+  coordsText: string
+): { texture: THREE.CanvasTexture; canvas: HTMLCanvasElement } {
+  if (typeof document === 'undefined') {
+    return {
+      texture: new THREE.CanvasTexture({} as HTMLCanvasElement),
+      canvas: {} as HTMLCanvasElement,
+    };
+  }
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 112;
+  updateTargetBadgeCanvas(canvas, targetTitle, coordsText);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.needsUpdate = true;
+  return { texture, canvas };
+}
+
 // 1. Realistic Airy-Disk Optical Star Sprite Texture (eliminates square WebGL point-boxes)
 function createStarSpriteTexture(): THREE.Texture {
   if (typeof document === 'undefined') {
@@ -147,6 +234,7 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
     showOrrery,
     showScanPath,
     autoRotate,
+    activePresetName,
     setCoordinates,
     setHoveredObject,
     planetXMarker,
@@ -155,6 +243,7 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
   const storeValuesRef = useRef({
     ra,
     dec,
+    activePresetName,
     viewMode,
     showSunExclusion,
     showBoresight,
@@ -174,6 +263,7 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
     storeValuesRef.current = {
       ra,
       dec,
+      activePresetName,
       viewMode,
       showSunExclusion,
       showBoresight,
@@ -191,6 +281,7 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
   }, [
     ra,
     dec,
+    activePresetName,
     viewMode,
     showSunExclusion,
     showBoresight,
@@ -1311,40 +1402,152 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
       cometMeshes.push({ nucleus, coma, ionTail, dustTail, orbit: comet });
     });
 
-    // --- 8. Selected Target Reticle & Candidate Markers ---
+    // --- 8. Solar System Scope Inspired Precision Target Selector HUD ---
     const targetGroup = new THREE.Group();
+    targetGroup.renderOrder = 9999;
     scene.add(targetGroup);
 
-    // Concentric reticle rings
-    const ring1Geo = new THREE.RingGeometry(1.4, 1.8, 32);
-    const ring1Mat = new THREE.MeshBasicMaterial({
+    // 8.1 Four Aerodynamic Corner Precision Brackets (┌ ┐ └ ┘)
+    const R_bracket = 5.2;
+    const L_arm = 1.6;
+    const bracketPts: THREE.Vector3[] = [];
+    // Top-Left (┌)
+    bracketPts.push(new THREE.Vector3(-R_bracket, R_bracket - L_arm, 0), new THREE.Vector3(-R_bracket, R_bracket, 0));
+    bracketPts.push(new THREE.Vector3(-R_bracket, R_bracket, 0), new THREE.Vector3(-R_bracket + L_arm, R_bracket, 0));
+    // Top-Right (┐)
+    bracketPts.push(new THREE.Vector3(R_bracket - L_arm, R_bracket, 0), new THREE.Vector3(R_bracket, R_bracket, 0));
+    bracketPts.push(new THREE.Vector3(R_bracket, R_bracket, 0), new THREE.Vector3(R_bracket, R_bracket - L_arm, 0));
+    // Bottom-Right (┘)
+    bracketPts.push(new THREE.Vector3(R_bracket, -R_bracket + L_arm, 0), new THREE.Vector3(R_bracket, -R_bracket, 0));
+    bracketPts.push(new THREE.Vector3(R_bracket, -R_bracket, 0), new THREE.Vector3(R_bracket - L_arm, -R_bracket, 0));
+    // Bottom-Left (└)
+    bracketPts.push(new THREE.Vector3(-R_bracket + L_arm, -R_bracket, 0), new THREE.Vector3(-R_bracket, -R_bracket, 0));
+    bracketPts.push(new THREE.Vector3(-R_bracket, -R_bracket, 0), new THREE.Vector3(-R_bracket, -R_bracket + L_arm, 0));
+
+    const bracketGeo = new THREE.BufferGeometry().setFromPoints(bracketPts);
+    const bracketMat = new THREE.LineBasicMaterial({
+      color: 0x00e5ff,
+      transparent: true,
+      opacity: 0.95,
+      blending: THREE.AdditiveBlending,
+      depthTest: false,
+      depthWrite: false,
+    });
+    const cornerBrackets = new THREE.LineSegments(bracketGeo, bracketMat);
+    cornerBrackets.renderOrder = 9999;
+    targetGroup.add(cornerBrackets);
+
+    // 8.2 Inner Rotating Segmented Orbiting HUD Reticle
+    const segRingPts: THREE.Vector3[] = [];
+    const numSegments = 8;
+    for (let s = 0; s < numSegments; s++) {
+      const startAng = (s / numSegments) * Math.PI * 2 + 0.08;
+      const endAng = ((s + 0.65) / numSegments) * Math.PI * 2;
+      const arcSteps = 6;
+      for (let j = 0; j < arcSteps; j++) {
+        const a1 = startAng + ((endAng - startAng) * j) / arcSteps;
+        const a2 = startAng + ((endAng - startAng) * (j + 1)) / arcSteps;
+        segRingPts.push(
+          new THREE.Vector3(Math.cos(a1) * 3.8, Math.sin(a1) * 3.8, 0),
+          new THREE.Vector3(Math.cos(a2) * 3.8, Math.sin(a2) * 3.8, 0)
+        );
+      }
+    }
+    const segRingGeo = new THREE.BufferGeometry().setFromPoints(segRingPts);
+    const segRingMat = new THREE.LineBasicMaterial({
+      color: 0x38bdf8,
+      transparent: true,
+      opacity: 0.85,
+      blending: THREE.AdditiveBlending,
+      depthTest: false,
+      depthWrite: false,
+    });
+    const segmentedRing = new THREE.LineSegments(segRingGeo, segRingMat);
+    segmentedRing.renderOrder = 9999;
+    targetGroup.add(segmentedRing);
+
+    // 8.3 Outer Precision Circular Ring
+    const outerRingGeo = new THREE.RingGeometry(5.8, 5.95, 64);
+    const outerRingMat = new THREE.MeshBasicMaterial({
       color: 0x00e5ff,
       side: THREE.DoubleSide,
       transparent: true,
-      opacity: 0.8,
+      opacity: 0.45,
+      blending: THREE.AdditiveBlending,
+      depthTest: false,
+      depthWrite: false,
     });
-    const ring1 = new THREE.Mesh(ring1Geo, ring1Mat);
+    const outerRing = new THREE.Mesh(outerRingGeo, outerRingMat);
+    outerRing.renderOrder = 9999;
+    targetGroup.add(outerRing);
 
-    const ring2Geo = new THREE.RingGeometry(2.4, 2.7, 32);
-    const ring2Mat = new THREE.MeshBasicMaterial({
+    // 8.4 Four Cardinal Crosshair Ticks
+    const tickPts: THREE.Vector3[] = [
+      new THREE.Vector3(0, 6.2, 0), new THREE.Vector3(0, 7.4, 0),
+      new THREE.Vector3(0, -6.2, 0), new THREE.Vector3(0, -7.4, 0),
+      new THREE.Vector3(6.2, 0, 0), new THREE.Vector3(7.4, 0, 0),
+      new THREE.Vector3(-6.2, 0, 0), new THREE.Vector3(-7.4, 0, 0),
+    ];
+    const tickGeo = new THREE.BufferGeometry().setFromPoints(tickPts);
+    const tickMat = new THREE.LineBasicMaterial({
+      color: 0x00e5ff,
+      transparent: true,
+      opacity: 0.9,
+      depthTest: false,
+      depthWrite: false,
+    });
+    const crosshairTicks = new THREE.LineSegments(tickGeo, tickMat);
+    crosshairTicks.renderOrder = 9999;
+    targetGroup.add(crosshairTicks);
+
+    // 8.5 Center Glowing Reticle Core Dot
+    const centerCoreGeo = new THREE.CircleGeometry(0.35, 16);
+    const centerCoreMat = new THREE.MeshBasicMaterial({
+      color: 0xffffff,
+      side: THREE.DoubleSide,
+      transparent: true,
+      opacity: 0.95,
+      blending: THREE.AdditiveBlending,
+      depthTest: false,
+      depthWrite: false,
+    });
+    const centerCore = new THREE.Mesh(centerCoreGeo, centerCoreMat);
+    centerCore.renderOrder = 9999;
+    targetGroup.add(centerCore);
+
+    // 8.6 Dynamic Radar Acquisition Pulse Ring
+    const radarPingGeo = new THREE.RingGeometry(1.8, 2.0, 48);
+    const radarPingMat = new THREE.MeshBasicMaterial({
       color: 0x00e5ff,
       side: THREE.DoubleSide,
       transparent: true,
-      opacity: 0.4,
+      opacity: 0.7,
+      blending: THREE.AdditiveBlending,
+      depthTest: false,
+      depthWrite: false,
     });
-    const ring2 = new THREE.Mesh(ring2Geo, ring2Mat);
+    const radarPing = new THREE.Mesh(radarPingGeo, radarPingMat);
+    radarPing.renderOrder = 9999;
+    targetGroup.add(radarPing);
 
-    targetGroup.add(ring1);
-    targetGroup.add(ring2);
-
-    // 3D Astronomical Flux Relief Mesh at Target Coordinates (visible in Sky Survey mode)
-    const skyTargetReliefGroup = new THREE.Group();
-    targetGroup.add(skyTargetReliefGroup);
-    const skyFluxMesh = new THREE.Mesh(fluxGeo, fluxMat);
-    skyTargetReliefGroup.add(skyFluxMesh);
-    const skyWireMesh = new THREE.LineSegments(wireGeo, wireMat);
-    skyTargetReliefGroup.add(skyWireMesh);
-    skyTargetReliefGroup.scale.set(0.65, 0.65, 0.65);
+    // 8.7 Floating Target Holographic Info Badge (Billboard HUD)
+    const { texture: badgeTexture, canvas: badgeCanvas } = createTargetBadgeTexture(
+      activePresetName || 'Target Field',
+      `RA: ${ra.toFixed(2)}° | DEC: ${dec.toFixed(2)}°`
+    );
+    const badgeMat = new THREE.SpriteMaterial({
+      map: badgeTexture,
+      transparent: true,
+      opacity: 0.92,
+      depthTest: false,
+      depthWrite: false,
+    });
+    const targetBadgeSprite = new THREE.Sprite(badgeMat);
+    targetBadgeSprite.center.set(0.5, 0.0);
+    targetBadgeSprite.renderOrder = 9999;
+    targetBadgeSprite.scale.set(11.5, 2.5, 1);
+    targetBadgeSprite.position.set(0, 8.2, 0);
+    targetGroup.add(targetBadgeSprite);
 
     // Hypothetical Planet X marker (magenta)
     const planetXGroup = new THREE.Group();
@@ -1548,6 +1751,11 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
     let lastTime = performance.now();
     let transitionFrames = 0;
     let lastViewMode = storeValuesRef.current.viewMode;
+    let lastTargetRa = -999;
+    let lastTargetDec = -999;
+    let lastTargetName: string | null = null;
+    let cameraSlewFrames = 0;
+    const desiredCameraPos = new THREE.Vector3(0, 30, 160);
 
     const animate = () => {
       reqId = requestAnimationFrame(animate);
@@ -1675,11 +1883,8 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
         sphereRadius * 0.985
       );
       targetGroup.position.copy(targetPos);
-      targetGroup.lookAt(new THREE.Vector3(0, 0, 0));
+      targetGroup.quaternion.copy(camera.quaternion);
       targetGroup.visible = !isSpacecraftMode;
-
-      // 3D Image Relief at Target in Sky Survey Mode
-      skyTargetReliefGroup.visible = storeValuesRef.current.show3DImageRelief && !isSpacecraftMode;
 
       // Planet X sky marker
       const pxm = storeValuesRef.current.planetXMarker;
@@ -1750,15 +1955,62 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
         if (transitionFrames > 0) {
           camera.position.lerp(new THREE.Vector3(0, 30, 160), 0.06);
           transitionFrames--;
+        } else if (cameraSlewFrames > 0) {
+          camera.position.lerp(desiredCameraPos, 0.06);
+          cameraSlewFrames--;
         }
         controls.target.lerp(new THREE.Vector3(0, 0, 0), 0.1);
       }
 
-      // Pulse reticle
-      const scale1 = 1.0 + Math.sin(elapsed * 3) * 0.08;
-      const scale2 = 1.0 + Math.cos(elapsed * 2.5) * 0.12;
-      ring1.scale.set(scale1, scale1, 1);
-      ring2.scale.set(scale2, scale2, 1);
+      // Animate Solar System Scope Precision Target Selector with Constant Screen-Space Scaling
+      const distToCamera = camera.position.distanceTo(targetPos);
+      const hudScale = Math.max(0.4, distToCamera / 140.0);
+
+      segmentedRing.rotation.z = -elapsed * 0.45;
+      segmentedRing.scale.set(hudScale, hudScale, 1);
+      centerCore.scale.set(hudScale, hudScale, 1);
+
+      const breath = (1.0 + Math.sin(elapsed * 2.4) * 0.04) * hudScale;
+      cornerBrackets.scale.set(breath, breath, 1);
+      outerRing.scale.set(breath, breath, 1);
+      crosshairTicks.scale.set(breath, breath, 1);
+
+      // Expanding Radar Pulse Ring
+      const pingT = (elapsed * 0.75) % 1.0;
+      radarPing.scale.set((1.0 + pingT * 3.5) * hudScale, (1.0 + pingT * 3.5) * hudScale, 1);
+      radarPingMat.opacity = Math.max(0, (1.0 - pingT) * 0.7);
+
+      // Floating Badge Scale & Position
+      targetBadgeSprite.scale.set(11.5 * hudScale, 2.5 * hudScale, 1);
+      targetBadgeSprite.position.set(0, 8.2 * hudScale, 0);
+
+      // Dynamically update floating target HUD badge when coordinates or preset change
+      const curRa = storeValuesRef.current.ra;
+      const curDec = storeValuesRef.current.dec;
+      const curName = storeValuesRef.current.activePresetName;
+      if (curRa !== lastTargetRa || curDec !== lastTargetDec || curName !== lastTargetName) {
+        const isInitial = lastTargetRa === -999;
+        lastTargetRa = curRa;
+        lastTargetDec = curDec;
+        lastTargetName = curName;
+        updateTargetBadgeCanvas(
+          badgeCanvas,
+          curName || 'Target Field',
+          `RA: ${curRa.toFixed(2)}° | DEC: ${curDec.toFixed(2)}°`
+        );
+        badgeTexture.needsUpdate = true;
+
+        if (!isInitial && storeValuesRef.current.viewMode === 'sky') {
+          const tDir = icrsToUnitVector(curRa, curDec, 1.0);
+          const camDist = 160;
+          desiredCameraPos.set(
+            -tDir.x * camDist * 0.95,
+            -tDir.y * camDist * 0.95 + 26,
+            -tDir.z * camDist * 0.95
+          ).normalize().multiplyScalar(camDist);
+          cameraSlewFrames = 40;
+        }
+      }
 
       // Pulse sample candidates
       candidateMeshes.forEach(({ mesh }, idx) => {
@@ -1803,10 +2055,20 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
       scanMat.dispose();
       sunGeo.dispose();
       sunMat.dispose();
-      ring1Geo.dispose();
-      ring1Mat.dispose();
-      ring2Geo.dispose();
-      ring2Mat.dispose();
+      bracketGeo.dispose();
+      bracketMat.dispose();
+      segRingGeo.dispose();
+      segRingMat.dispose();
+      outerRingGeo.dispose();
+      outerRingMat.dispose();
+      tickGeo.dispose();
+      tickMat.dispose();
+      centerCoreGeo.dispose();
+      centerCoreMat.dispose();
+      radarPingGeo.dispose();
+      radarPingMat.dispose();
+      badgeTexture.dispose();
+      badgeMat.dispose();
       rayGeo.dispose();
       rayMat.dispose();
       emitGeo.dispose();

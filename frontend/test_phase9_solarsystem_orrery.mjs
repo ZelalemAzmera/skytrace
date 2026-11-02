@@ -62,3 +62,4 @@ run().catch((err) => {
   console.error('❌ Error during visual verification:', err);
   process.exit(1);
 });
+
