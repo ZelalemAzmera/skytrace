@@ -12,6 +12,9 @@ import {
   equatorialToEcliptic,
   BRIGHT_STARS,
   PLANET_ORBITS,
+  COMET_ORBITS,
+  CelestialOrbit,
+  CometOrbit,
   keplerToCartesian,
   getJulianDate,
 } from '../../lib/astrometry';
@@ -723,8 +726,21 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
             const m = child as THREE.Mesh;
             if (m.material) {
               const mat = m.material as THREE.MeshStandardMaterial;
-              mat.roughness = 0.32;
-              mat.metalness = 0.78;
+              if (mat.name === 'white_krinkle') {
+                mat.color.setHex(0xd1d5db); // authentic aerospace thermal-protective silver/aluminum
+                mat.roughness = 0.38;
+                mat.metalness = 0.55;
+              } else if (mat.name?.includes('gold')) {
+                mat.color.setHex(0xffd700);
+                mat.roughness = 0.18;
+                mat.metalness = 0.95;
+              } else if (mat.name?.includes('aluminum') || mat.name?.includes('chrome')) {
+                mat.roughness = 0.22;
+                mat.metalness = 0.88;
+              } else {
+                mat.roughness = 0.35;
+                mat.metalness = 0.65;
+              }
             }
           }
         });
@@ -999,20 +1015,19 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
     });
     scanGroup.add(new THREE.Line(scanGeo, scanMat));
 
-    // --- 7. Solar System Orrery with Solar System Scope Authentic Textures ---
+    // --- 7. Solar System Orrery with Solar System Scope Authentic Textures & Orbital Model ---
     const orreryGroup = new THREE.Group();
     scene.add(orreryGroup);
-    const ORRERY_SCALE = 18.0;
 
     // Central Sun with Solar System Scope Photosphere
-    const sunGeo = new THREE.SphereGeometry(1.5, 48, 48);
+    const sunGeo = new THREE.SphereGeometry(1.8, 48, 48);
     const sunMat = new THREE.MeshBasicMaterial({
       map: planetTextures.Sun,
     });
     const sunMesh = new THREE.Mesh(sunGeo, sunMat);
     orreryGroup.add(sunMesh);
 
-    // Multi-layered Solar Corona and Atmospheric Glow
+    // Multi-layered Solar Corona and Atmospheric Glow (Tuned with clear vacuum buffer before Mercury at r=8.34)
     const coronaTexture = createSunCoronaTexture();
     const innerCoronaMat = new THREE.SpriteMaterial({
       map: coronaTexture,
@@ -1023,7 +1038,7 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
       depthWrite: false,
     });
     const innerCorona = new THREE.Sprite(innerCoronaMat);
-    innerCorona.scale.set(7.5, 7.5, 1);
+    innerCorona.scale.set(5.6, 5.6, 1); // Radius 2.8
     orreryGroup.add(innerCorona);
 
     const outerCoronaMat = new THREE.SpriteMaterial({
@@ -1035,25 +1050,25 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
       depthWrite: false,
     });
     const outerCorona = new THREE.Sprite(outerCoronaMat);
-    outerCorona.scale.set(16.0, 16.0, 1);
+    outerCorona.scale.set(9.0, 9.0, 1); // Radius 4.5 (leaves wide 3.84 unit vacuum gap to Mercury's perihelion at 8.34)
     orreryGroup.add(outerCorona);
 
-    // Add Solar System Scope Central PointLight
-    const sunPointLight = new THREE.PointLight(0xfff6ea, 3.8, 500);
+    // Central Sunlight PointLight
+    const sunPointLight = new THREE.PointLight(0xfff6ea, 3.5, 500);
     sunPointLight.position.set(0, 0, 0);
     orreryGroup.add(sunPointLight);
 
     // Build Keplerian Planetary Bodies
     interface PlanetMeshItem {
       mesh: THREE.Mesh;
-      orbit: (typeof PLANET_ORBITS)[0];
+      orbit: CelestialOrbit;
       clouds?: THREE.Mesh;
       rings?: THREE.Mesh;
     }
     const planetMeshes: PlanetMeshItem[] = [];
 
     PLANET_ORBITS.forEach((orbit) => {
-      // Orbital Ellipse Path
+      // Orbital Ellipse Path (calibrated 1.0 visual scale)
       const pts: THREE.Vector3[] = [];
       const numPts = 128;
       for (let step = 0; step <= numPts; step++) {
@@ -1066,7 +1081,7 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
             orbit.omega,
             orbit.Omega,
             m,
-            ORRERY_SCALE
+            1.0
           )
         );
       }
@@ -1079,13 +1094,14 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
       orreryGroup.add(new THREE.Line(oGeo, oMat));
 
       // Textured Planetary Sphere
-      const tex = planetTextures[orbit.name];
+      const tex = planetTextures[orbit.name] || (orbit.name === 'Ceres' || orbit.name === 'Pluto' ? planetTextures.Moon : undefined);
       const pGeo = new THREE.SphereGeometry(orbit.size, 32, 24);
       const pMat = tex
         ? new THREE.MeshStandardMaterial({
             map: tex,
-            roughness: 0.65,
+            roughness: orbit.name === 'Ceres' || orbit.name === 'Pluto' ? 0.85 : 0.65,
             metalness: 0.05,
+            color: orbit.name === 'Ceres' ? 0xcbc5b9 : orbit.name === 'Pluto' ? 0xc6a487 : 0xffffff,
           })
         : new THREE.MeshStandardMaterial({
             color: new THREE.Color(orbit.color),
@@ -1139,6 +1155,160 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
       }
 
       planetMeshes.push({ mesh: pMesh, orbit, clouds: pClouds, rings: pRings });
+    });
+
+    // --- 7.2 Earth-Moon System (Moon Orbiting Earth) ---
+    const moonGeo = new THREE.SphereGeometry(0.32, 24, 20);
+    const moonMat = new THREE.MeshStandardMaterial({
+      map: planetTextures.Moon,
+      roughness: 0.85,
+      metalness: 0.05,
+    });
+    const moonMesh = new THREE.Mesh(moonGeo, moonMat);
+    orreryGroup.add(moonMesh);
+
+    // Moon Lunar Orbit Trace Ring around Earth
+    const moonOrbitPts: THREE.Vector3[] = [];
+    for (let step = 0; step <= 64; step++) {
+      const ang = (step / 64) * Math.PI * 2;
+      moonOrbitPts.push(new THREE.Vector3(Math.cos(ang) * 1.85, Math.sin(ang) * 1.85 * 0.089, Math.sin(ang) * 1.85 * 0.996));
+    }
+    const moonOrbitGeo = new THREE.BufferGeometry().setFromPoints(moonOrbitPts);
+    const moonOrbitMat = new THREE.LineBasicMaterial({
+      color: 0x94a3b8,
+      transparent: true,
+      opacity: 0.35,
+    });
+    const moonOrbitLine = new THREE.Line(moonOrbitGeo, moonOrbitMat);
+    orreryGroup.add(moonOrbitLine);
+
+    // --- 7.3 Main Asteroid Belt Swarm (Between Mars and Jupiter) ---
+    const asteroidBeltCount = 1200;
+    const asteroidPositions = new Float32Array(asteroidBeltCount * 3);
+    const asteroidColors = new Float32Array(asteroidBeltCount * 3);
+    const rockTones = [
+      new THREE.Color(0x8d8276),
+      new THREE.Color(0xa89f91),
+      new THREE.Color(0x6d6459),
+      new THREE.Color(0x524b43),
+      new THREE.Color(0x9ca3af),
+    ];
+
+    for (let i = 0; i < asteroidBeltCount; i++) {
+      const r = 34.0 + Math.random() * 5.5; // situated between r=34.0 (Mars aphelion 32.6) and r=39.5 (Jupiter perihelion 45.2)
+      const theta = Math.random() * Math.PI * 2;
+      const yDisp = (Math.random() - 0.5) * 1.6;
+      asteroidPositions[i * 3] = Math.cos(theta) * r;
+      asteroidPositions[i * 3 + 1] = yDisp;
+      asteroidPositions[i * 3 + 2] = Math.sin(theta) * r;
+
+      const c = rockTones[Math.floor(Math.random() * rockTones.length)];
+      asteroidColors[i * 3] = c.r;
+      asteroidColors[i * 3 + 1] = c.g;
+      asteroidColors[i * 3 + 2] = c.b;
+    }
+
+    const asteroidBeltGeo = new THREE.BufferGeometry();
+    asteroidBeltGeo.setAttribute('position', new THREE.BufferAttribute(asteroidPositions, 3));
+    asteroidBeltGeo.setAttribute('color', new THREE.BufferAttribute(asteroidColors, 3));
+    const asteroidBeltMat = new THREE.PointsMaterial({
+      size: 1.25,
+      map: dustSpriteTexture,
+      vertexColors: true,
+      transparent: true,
+      opacity: 0.65,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    });
+    const asteroidBeltPoints = new THREE.Points(asteroidBeltGeo, asteroidBeltMat);
+    orreryGroup.add(asteroidBeltPoints);
+
+    // --- 7.4 Solar System Scope Comets with Dynamic 3D Solar Wind Tails ---
+    interface CometMeshItem {
+      nucleus: THREE.Mesh;
+      coma: THREE.Mesh;
+      ionTail: THREE.Mesh;
+      dustTail: THREE.Mesh;
+      orbit: CometOrbit;
+    }
+    const cometMeshes: CometMeshItem[] = [];
+
+    COMET_ORBITS.forEach((comet) => {
+      // Orbit path
+      const pts: THREE.Vector3[] = [];
+      const numPts = 128;
+      for (let step = 0; step <= numPts; step++) {
+        const m = (step / numPts) * 360;
+        pts.push(
+          keplerToCartesian(
+            comet.a,
+            comet.e,
+            comet.i,
+            comet.omega,
+            comet.Omega,
+            m,
+            1.0
+          )
+        );
+      }
+      const cGeo = new THREE.BufferGeometry().setFromPoints(pts);
+      const cMat = new THREE.LineBasicMaterial({
+        color: new THREE.Color(comet.color),
+        transparent: true,
+        opacity: 0.35,
+      });
+      orreryGroup.add(new THREE.Line(cGeo, cMat));
+
+      // Nucleus
+      const nGeo = new THREE.SphereGeometry(comet.size, 16, 12);
+      const nMat = new THREE.MeshStandardMaterial({
+        color: 0x334155,
+        roughness: 0.9,
+      });
+      const nucleus = new THREE.Mesh(nGeo, nMat);
+      orreryGroup.add(nucleus);
+
+      // Coma (glowing atmosphere)
+      const comaGeo = new THREE.SphereGeometry(comet.size * 2.2, 16, 16);
+      const comaMat = new THREE.MeshBasicMaterial({
+        color: comet.tailColor,
+        transparent: true,
+        opacity: 0.75,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      });
+      const coma = new THREE.Mesh(comaGeo, comaMat);
+      orreryGroup.add(coma);
+
+      // Dynamic 3D Ion Tail (cylinder aligned anti-solar)
+      const ionGeo = new THREE.CylinderGeometry(0.12, 1.2, 1.0, 16, 1, true);
+      ionGeo.translate(0, 0.5, 0); // origin at base of nucleus
+      const ionMat = new THREE.MeshBasicMaterial({
+        color: comet.tailColor,
+        transparent: true,
+        opacity: 0.5,
+        side: THREE.DoubleSide,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      });
+      const ionTail = new THREE.Mesh(ionGeo, ionMat);
+      orreryGroup.add(ionTail);
+
+      // Dynamic 3D Dust Tail (lagging golden tail)
+      const dustGeo = new THREE.CylinderGeometry(0.18, 1.8, 1.0, 16, 1, true);
+      dustGeo.translate(0, 0.5, 0);
+      const dustMat = new THREE.MeshBasicMaterial({
+        color: comet.dustTailColor,
+        transparent: true,
+        opacity: 0.35,
+        side: THREE.DoubleSide,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      });
+      const dustTail = new THREE.Mesh(dustGeo, dustMat);
+      orreryGroup.add(dustTail);
+
+      cometMeshes.push({ nucleus, coma, ionTail, dustTail, orbit: comet });
     });
 
     // --- 8. Selected Target Reticle & Candidate Markers ---
@@ -1239,7 +1409,7 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
         }
       }
 
-      // Check Planets
+      // Check Planets & Dwarf Planets
       const planetHitObjects = planetMeshes.map((p) => p.mesh);
       const planetHits = raycaster.intersectObjects(planetHitObjects);
       if (planetHits.length > 0) {
@@ -1247,11 +1417,45 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
         if (hitP) {
           const icrs = vectorToIcrs(planetHits[0].point);
           setHoveredObject({
-            name: `${hitP.orbit.name} (Planet)`,
+            name: `${hitP.orbit.name} (${hitP.orbit.category})`,
             ra: icrs.ra,
             dec: icrs.dec,
             type: 'Planet',
-            extra: `Semi-major axis: ${hitP.orbit.a} AU | Period: ${hitP.orbit.periodDays.toFixed(1)} days`,
+            extra: `Semi-major axis: ${hitP.orbit.realAU.toFixed(3)} AU | Period: ${hitP.orbit.periodDays.toFixed(1)} days | Eccentricity: ${hitP.orbit.e.toFixed(3)} | ${hitP.orbit.description}`,
+          });
+          renderer.domElement.style.cursor = 'pointer';
+          return;
+        }
+      }
+
+      // Check Moon
+      const moonHits = raycaster.intersectObject(moonMesh);
+      if (moonHits.length > 0) {
+        const icrs = vectorToIcrs(moonHits[0].point);
+        setHoveredObject({
+          name: "Moon (Earth's Natural Satellite)",
+          ra: icrs.ra,
+          dec: icrs.dec,
+          type: 'Planet',
+          extra: 'Distance to Earth: 384,400 km (0.00257 AU) | Period: 27.32 days | Tidally locked | Synchronous rotation',
+        });
+        renderer.domElement.style.cursor = 'pointer';
+        return;
+      }
+
+      // Check Comets
+      const cometHitObjects = cometMeshes.map((c) => c.nucleus);
+      const cometHits = raycaster.intersectObjects(cometHitObjects);
+      if (cometHits.length > 0) {
+        const hitC = cometMeshes.find((c) => c.nucleus === cometHits[0].object);
+        if (hitC) {
+          const icrs = vectorToIcrs(cometHits[0].point);
+          setHoveredObject({
+            name: `${hitC.orbit.name} (Comet)`,
+            ra: icrs.ra,
+            dec: icrs.dec,
+            type: 'Candidate',
+            extra: `Semi-major axis: ${hitC.orbit.realAU.toFixed(1)} AU | Period: ${(hitC.orbit.periodDays / 365.25).toFixed(1)} yrs | Eccentricity: ${hitC.orbit.e.toFixed(2)} | Dual 3D Anti-Solar Tails | ${hitC.orbit.description}`,
           });
           renderer.domElement.style.cursor = 'pointer';
           return;
@@ -1388,9 +1592,11 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
         scanGroup.rotation.y = elapsed * 0.08;
       }
 
-      // Update Planet positions via Kepler solver
+      // Update Planetary, Lunar, Asteroid & Cometary orbits via Kepler solver
       if (storeValuesRef.current.showOrrery) {
         const jd = getJulianDate();
+        let earthPos = new THREE.Vector3(22.8, 0, 0);
+
         planetMeshes.forEach(({ mesh, orbit, clouds }) => {
           const mDeg = ((jd - 2451545.0) * (360.0 / orbit.periodDays)) % 360;
           const pos = keplerToCartesian(
@@ -1400,13 +1606,65 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
             orbit.omega,
             orbit.Omega,
             mDeg,
-            ORRERY_SCALE
+            1.0
           );
           mesh.position.copy(pos);
           mesh.rotation.y = elapsed * 0.4;
           if (clouds) {
             clouds.rotation.y = elapsed * 0.48;
           }
+          if (orbit.name === 'Earth') {
+            earthPos = pos.clone();
+          }
+        });
+
+        // Update Earth's Moon
+        const moonOrbitAngle = ((jd - 2451545.0) * (360.0 / 27.32166)) * (Math.PI / 180);
+        moonMesh.position.set(
+          earthPos.x + Math.cos(moonOrbitAngle) * 1.85,
+          earthPos.y + Math.sin(moonOrbitAngle) * 1.85 * 0.089, // 5.14 deg lunar inclination
+          earthPos.z + Math.sin(moonOrbitAngle) * 1.85 * 0.996
+        );
+        moonMesh.rotation.y = moonOrbitAngle; // synchronous tidal locking
+        moonOrbitLine.position.copy(earthPos);
+
+        // Rotate Asteroid Belt
+        asteroidBeltPoints.rotation.y = elapsed * 0.015;
+
+        // Update Comets with Dynamic 3D Anti-Solar Tails
+        cometMeshes.forEach(({ nucleus, coma, ionTail, dustTail, orbit }) => {
+          const mDeg = ((jd - 2451545.0) * (360.0 / orbit.periodDays)) % 360;
+          const pos = keplerToCartesian(
+            orbit.a,
+            orbit.e,
+            orbit.i,
+            orbit.omega,
+            orbit.Omega,
+            mDeg,
+            1.0
+          );
+          nucleus.position.copy(pos);
+          coma.position.copy(pos);
+
+          // Solar distance and anti-solar direction (away from Sun at 0,0,0)
+          const rSun = pos.length();
+          const antiSolar = pos.clone().normalize();
+
+          // Tail length scales dramatically as comet approaches perihelion (1/r scaling)
+          const tailLen = Math.max(6.0, Math.min(26.0, 160.0 / rSun));
+          const tailWidth = 0.25 + (20.0 / rSun) * 0.45;
+
+          // Ion Tail: Straight plasma beam pointing strictly away from Sun
+          ionTail.position.copy(pos);
+          const defaultUp = new THREE.Vector3(0, 1, 0);
+          ionTail.quaternion.setFromUnitVectors(defaultUp, antiSolar);
+          ionTail.scale.set(tailWidth, tailLen, tailWidth);
+
+          // Dust Tail: Warm golden tail slightly lagging behind orbit track
+          const dustDir = antiSolar.clone().add(new THREE.Vector3(-antiSolar.z * 0.25, 0, antiSolar.x * 0.25)).normalize();
+          dustTail.position.copy(pos);
+          dustTail.quaternion.setFromUnitVectors(defaultUp, dustDir);
+          dustTail.scale.set(tailWidth * 1.5, tailLen * 0.75, tailWidth * 1.5);
         });
       }
 
@@ -1561,6 +1819,12 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
       earthMat.dispose();
       atmoGeo.dispose();
       atmoMat.dispose();
+      moonGeo.dispose();
+      moonMat.dispose();
+      moonOrbitGeo.dispose();
+      moonOrbitMat.dispose();
+      asteroidBeltGeo.dispose();
+      asteroidBeltMat.dispose();
 
       if (container.contains(renderer.domElement)) {
         container.removeChild(renderer.domElement);
