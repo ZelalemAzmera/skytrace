@@ -15,7 +15,6 @@ import {
   searchCatalog,
   resolveObjectName,
   ResolvedTarget,
-  ASTRONOMICAL_CATALOG,
 } from '../../lib/resolver';
 import {
   Compass,
@@ -24,10 +23,11 @@ import {
   Navigation,
   Globe,
   Search,
-  CheckCircle,
   Telescope,
   ShieldCheck,
   ShieldAlert,
+  Layers,
+  Box,
 } from 'lucide-react';
 
 export default function SkyHUD() {
@@ -39,6 +39,8 @@ export default function SkyHUD() {
     hoveredObject,
     setCoordinates,
     setSelectedBand,
+    showTeardown,
+    show3DImageRelief,
   } = useSkyStore();
 
   const [inputRa, setInputRa] = useState<string>(ra.toFixed(4));
@@ -318,6 +320,32 @@ export default function SkyHUD() {
             {ra.toFixed(2)}°, {dec.toFixed(2)}°
           </span>
         </div>
+
+        {/* 3D Optical Teardown Details */}
+        {showTeardown && (
+          <div className="mt-2 pt-2 border-t border-[rgba(192,132,252,0.3)] bg-[rgba(192,132,252,0.06)] -mx-3 -mb-3 p-2.5 rounded-b">
+            <div className="text-[10px] font-mono text-[#c084fc] font-bold uppercase tracking-wider mb-1 flex items-center gap-1">
+              <Box className="w-3 h-3 text-[#c084fc]" />
+              <span>3D Optical Teardown</span>
+            </div>
+            <div className="grid grid-cols-2 gap-1.5 text-[10px] font-mono text-[var(--text-secondary)]">
+              <div>• 20cm f/3.0 Gold Mirror</div>
+              <div>• 6x H2RG Focal Arrays</div>
+              <div>• 102 Band LVF Filters</div>
+              <div>• 3.5° × 7.0° Frustum</div>
+            </div>
+          </div>
+        )}
+
+        {/* 3D Image Relief Telemetry */}
+        {show3DImageRelief && !showTeardown && (
+          <div className="mt-2 pt-2 border-t border-[rgba(255,215,0,0.25)] bg-[rgba(255,215,0,0.04)] -mx-3 -mb-3 p-2 rounded-b flex items-center justify-between text-[10px] font-mono text-[var(--text-secondary)]">
+            <span className="flex items-center gap-1 text-[var(--accent-gold)]">
+              <Layers className="w-3 h-3" /> 3D Image Relief:
+            </span>
+            <span className="text-[var(--text-primary)] font-semibold">102-Band Tomography</span>
+          </div>
+        )}
       </div>
 
       {/* Hovered Object Telemetry Card */}

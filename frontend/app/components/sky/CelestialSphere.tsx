@@ -21,6 +21,7 @@ interface CelestialSphereProps {
   className?: string;
 }
 
+// Procedural Solar Corona Texture Generator
 function createSunCoronaTexture(): THREE.Texture {
   if (typeof document === 'undefined') {
     return new THREE.Texture();
@@ -35,10 +36,91 @@ function createSunCoronaTexture(): THREE.Texture {
     gradient.addColorStop(0.12, 'rgba(255, 240, 160, 0.95)');
     gradient.addColorStop(0.28, 'rgba(255, 170, 50, 0.65)');
     gradient.addColorStop(0.55, 'rgba(255, 95, 15, 0.22)');
-    gradient.addColorStop(0.80, 'rgba(255, 50, 5, 0.06)');
+    gradient.addColorStop(0.8, 'rgba(255, 50, 5, 0.06)');
     gradient.addColorStop(1.0, 'rgba(0, 0, 0, 0.0)');
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, 512, 512);
+  }
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.needsUpdate = true;
+  return texture;
+}
+
+// 1. Realistic Airy-Disk Optical Star Sprite Texture (eliminates square WebGL point-boxes)
+function createStarSpriteTexture(): THREE.Texture {
+  if (typeof document === 'undefined') {
+    return new THREE.Texture();
+  }
+  const canvas = document.createElement('canvas');
+  canvas.width = 128;
+  canvas.height = 128;
+  const ctx = canvas.getContext('2d');
+  if (ctx) {
+    ctx.clearRect(0, 0, 128, 128);
+
+    // Soft Gaussian Airy halo with exponential falloff
+    const radGrad = ctx.createRadialGradient(64, 64, 0, 64, 64, 64);
+    radGrad.addColorStop(0.0, 'rgba(255, 255, 255, 1.0)');
+    radGrad.addColorStop(0.12, 'rgba(255, 250, 240, 0.95)');
+    radGrad.addColorStop(0.24, 'rgba(215, 235, 255, 0.6)');
+    radGrad.addColorStop(0.48, 'rgba(140, 190, 255, 0.2)');
+    radGrad.addColorStop(0.72, 'rgba(80, 130, 255, 0.05)');
+    radGrad.addColorStop(1.0, 'rgba(0, 0, 0, 0.0)');
+    ctx.fillStyle = radGrad;
+    ctx.fillRect(0, 0, 128, 128);
+
+    // Subtle 4-point telescope optical cross diffraction spikes
+    const spikeH = ctx.createLinearGradient(0, 64, 128, 64);
+    spikeH.addColorStop(0.0, 'rgba(255, 255, 255, 0.0)');
+    spikeH.addColorStop(0.42, 'rgba(255, 255, 255, 0.15)');
+    spikeH.addColorStop(0.5, 'rgba(255, 255, 255, 0.85)');
+    spikeH.addColorStop(0.58, 'rgba(255, 255, 255, 0.15)');
+    spikeH.addColorStop(1.0, 'rgba(255, 255, 255, 0.0)');
+    ctx.fillStyle = spikeH;
+    ctx.fillRect(0, 62, 128, 4);
+
+    const spikeV = ctx.createLinearGradient(64, 0, 64, 128);
+    spikeV.addColorStop(0.0, 'rgba(255, 255, 255, 0.0)');
+    spikeV.addColorStop(0.42, 'rgba(255, 255, 255, 0.15)');
+    spikeV.addColorStop(0.5, 'rgba(255, 255, 255, 0.85)');
+    spikeV.addColorStop(0.58, 'rgba(255, 255, 255, 0.15)');
+    spikeV.addColorStop(1.0, 'rgba(255, 255, 255, 0.0)');
+    ctx.fillStyle = spikeV;
+    ctx.fillRect(62, 0, 4, 128);
+
+    // Concentrated central stellar core
+    const coreGrad = ctx.createRadialGradient(64, 64, 0, 64, 64, 6);
+    coreGrad.addColorStop(0.0, 'rgba(255, 255, 255, 1.0)');
+    coreGrad.addColorStop(1.0, 'rgba(255, 255, 255, 0.0)');
+    ctx.fillStyle = coreGrad;
+    ctx.beginPath();
+    ctx.arc(64, 64, 6, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.needsUpdate = true;
+  return texture;
+}
+
+// 2. Ultra-Smooth Circular Dust Particle Sprite Texture for Milky Way Dust Lane
+function createDustSpriteTexture(): THREE.Texture {
+  if (typeof document === 'undefined') {
+    return new THREE.Texture();
+  }
+  const canvas = document.createElement('canvas');
+  canvas.width = 64;
+  canvas.height = 64;
+  const ctx = canvas.getContext('2d');
+  if (ctx) {
+    ctx.clearRect(0, 0, 64, 64);
+    const radGrad = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+    radGrad.addColorStop(0.0, 'rgba(255, 255, 255, 0.85)');
+    radGrad.addColorStop(0.2, 'rgba(240, 245, 255, 0.55)');
+    radGrad.addColorStop(0.45, 'rgba(200, 220, 255, 0.18)');
+    radGrad.addColorStop(0.75, 'rgba(150, 180, 255, 0.04)');
+    radGrad.addColorStop(1.0, 'rgba(0, 0, 0, 0.0)');
+    ctx.fillStyle = radGrad;
+    ctx.fillRect(0, 0, 64, 64);
   }
   const texture = new THREE.CanvasTexture(canvas);
   texture.needsUpdate = true;
@@ -53,6 +135,9 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
     viewMode,
     showSunExclusion,
     showBoresight,
+    show3DImageRelief,
+    showObservationVolume,
+    showTeardown,
     showEquatorialGrid,
     showEclipticGrid,
     showGalacticPlane,
@@ -70,6 +155,9 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
     viewMode,
     showSunExclusion,
     showBoresight,
+    show3DImageRelief,
+    showObservationVolume,
+    showTeardown,
     showEquatorialGrid,
     showEclipticGrid,
     showGalacticPlane,
@@ -86,6 +174,9 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
       viewMode,
       showSunExclusion,
       showBoresight,
+      show3DImageRelief,
+      showObservationVolume,
+      showTeardown,
       showEquatorialGrid,
       showEclipticGrid,
       showGalacticPlane,
@@ -100,6 +191,9 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
     viewMode,
     showSunExclusion,
     showBoresight,
+    show3DImageRelief,
+    showObservationVolume,
+    showTeardown,
     showEquatorialGrid,
     showEclipticGrid,
     showGalacticPlane,
@@ -161,8 +255,11 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
     const earthCloudsTexture = textureLoader.load('/textures/planets/earth_clouds.jpg');
     const saturnRingTexture = textureLoader.load('/textures/planets/saturn_ring.png');
     const milkyWayTexture = textureLoader.load('/textures/planets/stars_milky_way.jpg');
+    const flareTexture = textureLoader.load('/textures/planets/flare.png');
 
-
+    // Generate high-resolution optical star sprites (eliminating square WebGL point-boxes)
+    const starSpriteTexture = createStarSpriteTexture();
+    const dustSpriteTexture = createDustSpriteTexture();
 
     // --- 1.5 Vacuum PBR Space Lighting ---
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
@@ -223,8 +320,324 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
     emitMesh.position.set(0, 1.15, 0);
     spacecraftGroup.add(emitMesh);
 
+    // --- 2.6 3D Volumetric Observation Frustum (SPHEREx 3.5° × 7.0° Light Cone) ---
+    const observationFrustumGroup = new THREE.Group();
+    spacecraftGroup.add(observationFrustumGroup);
+
+    const fovX = (3.5 * Math.PI) / 180;
+    const fovZ = (7.0 * Math.PI) / 180;
+    const frustumDist = sphereRadius * 0.96; // 96 units
+    const hwBase = 0.18; // aperture half-width
+    const hzBase = 0.36; // aperture half-height (1:2 aspect ratio)
+    const hwEnd = Math.tan(fovX / 2) * frustumDist; // ~ 2.93
+    const hzEnd = Math.tan(fovZ / 2) * frustumDist; // ~ 5.87
+    const yStart = 1.15; // aperture ring height
+    const yEnd = frustumDist;
+
+    // 4 Corner Laser Guide Rails
+    const railPositions = [
+      new THREE.Vector3(hwBase, yStart, hzBase), new THREE.Vector3(hwEnd, yEnd, hzEnd),
+      new THREE.Vector3(-hwBase, yStart, hzBase), new THREE.Vector3(-hwEnd, yEnd, hzEnd),
+      new THREE.Vector3(-hwBase, yStart, -hzBase), new THREE.Vector3(-hwEnd, yEnd, -hzEnd),
+      new THREE.Vector3(hwBase, yStart, -hzBase), new THREE.Vector3(hwEnd, yEnd, -hzEnd),
+    ];
+    const railPts: THREE.Vector3[] = [];
+    railPts.push(railPositions[0], railPositions[1]);
+    railPts.push(railPositions[2], railPositions[3]);
+    railPts.push(railPositions[4], railPositions[5]);
+    railPts.push(railPositions[6], railPositions[7]);
+
+    const railGeo = new THREE.BufferGeometry().setFromPoints(railPts);
+    const railMat = new THREE.LineBasicMaterial({
+      color: 0x38bdf8,
+      transparent: true,
+      opacity: 0.6,
+      blending: THREE.AdditiveBlending,
+    });
+    const railLines = new THREE.LineSegments(railGeo, railMat);
+    observationFrustumGroup.add(railLines);
+
+    // 4 Volumetric Lateral Wall Planes
+    const wallGeo = new THREE.BufferGeometry();
+    const wallVertices = new Float32Array([
+      // Front (+Z)
+      hwBase, yStart, hzBase,   hwEnd, yEnd, hzEnd,     -hwEnd, yEnd, hzEnd,
+      hwBase, yStart, hzBase,   -hwEnd, yEnd, hzEnd,    -hwBase, yStart, hzBase,
+      // Back (-Z)
+      -hwBase, yStart, -hzBase, -hwEnd, yEnd, -hzEnd,   hwEnd, yEnd, -hzEnd,
+      -hwBase, yStart, -hzBase, hwEnd, yEnd, -hzEnd,    hwBase, yStart, -hzBase,
+      // Right (+X)
+      hwBase, yStart, -hzBase,  hwEnd, yEnd, -hzEnd,    hwEnd, yEnd, hzEnd,
+      hwBase, yStart, -hzBase,  hwEnd, yEnd, hzEnd,     hwBase, yStart, hzBase,
+      // Left (-X)
+      -hwBase, yStart, hzBase,  -hwEnd, yEnd, hzEnd,    -hwEnd, yEnd, -hzEnd,
+      -hwBase, yStart, hzBase,  -hwEnd, yEnd, -hzEnd,   -hwBase, yStart, -hzBase,
+    ]);
+    wallGeo.setAttribute('position', new THREE.BufferAttribute(wallVertices, 3));
+    wallGeo.computeVertexNormals();
+
+    const wallMat = new THREE.MeshBasicMaterial({
+      color: 0x0ea5e9,
+      transparent: true,
+      opacity: 0.08,
+      side: THREE.DoubleSide,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    });
+    const wallMesh = new THREE.Mesh(wallGeo, wallMat);
+    observationFrustumGroup.add(wallMesh);
+
+    // Traveling Wavefront Pulse Ring
+    const pulseRingGeo = new THREE.BufferGeometry();
+    const pulseRingMat = new THREE.LineBasicMaterial({
+      color: 0x00e5ff,
+      transparent: true,
+      opacity: 0.85,
+      blending: THREE.AdditiveBlending,
+    });
+    const pulseRing = new THREE.LineLoop(pulseRingGeo, pulseRingMat);
+    observationFrustumGroup.add(pulseRing);
+
+    // --- 2.7 3D Astronomical Image Heightfield Relief Algorithm ---
+    // Converts 2D telescope detector measurements into a 3D topographic flux structure
+    const telescopeImageReliefGroup = new THREE.Group();
+    telescopeImageReliefGroup.position.set(0, yEnd, 0);
+    // Orient so surface normal faces down along -Y toward spacecraft
+    telescopeImageReliefGroup.rotation.x = -Math.PI / 2;
+    spacecraftGroup.add(telescopeImageReliefGroup);
+
+    const gridW = hwEnd * 2; // ~5.86
+    const gridH = hzEnd * 2; // ~11.74
+    const segX = 40;
+    const segY = 40;
+    const fluxGeo = new THREE.PlaneGeometry(gridW, gridH, segX, segY);
+    const posAttr = fluxGeo.attributes.position;
+    const vertexCount = posAttr.count;
+    const fluxColors = new Float32Array(vertexCount * 3);
+
+    for (let i = 0; i < vertexCount; i++) {
+      const u = posAttr.getX(i) / (gridW / 2); // -1 to +1
+      const v = posAttr.getY(i) / (gridH / 2); // -1 to +1
+
+      // 1. Primary Discovered Candidate Transient Peak (e.g. Brown Dwarf / Planet X anomaly)
+      const candD2 = (u - 0.12) * (u - 0.12) + (v + 0.10) * (v + 0.10);
+      const fCand = 1.6 * Math.exp(-candD2 / (2 * 0.07 * 0.07));
+
+      // 2. Reference Field Stars
+      const s1 = 0.9 * Math.exp(-((u + 0.45) ** 2 + (v - 0.5) ** 2) / (2 * 0.045 ** 2));
+      const s2 = 0.7 * Math.exp(-((u - 0.55) ** 2 + (v - 0.35) ** 2) / (2 * 0.04 ** 2));
+      const s3 = 0.8 * Math.exp(-((u + 0.3) ** 2 + (v + 0.6) ** 2) / (2 * 0.05 ** 2));
+      const s4 = 0.65 * Math.exp(-((u - 0.4) ** 2 + (v + 0.55) ** 2) / (2 * 0.04 ** 2));
+
+      // 3. Diffuse Infrared Cirrus / Molecular Cloud
+      const fNebula =
+        0.26 * (Math.sin(2.4 * u + 1.2) * Math.cos(2.2 * v - 0.5) + 0.4 * Math.cos(4.2 * u) * Math.sin(3.8 * v));
+
+      // 4. Photometric Noise
+      const fNoise = 0.035 * Math.sin(16 * u) * Math.cos(16 * v);
+
+      const totalFlux = Math.max(0, fCand + s1 + s2 + s3 + s4 + fNebula + fNoise);
+
+      // Topographic displacement along optical normal (+Z in local PlaneGeometry space)
+      const zDisp = Math.pow(totalFlux, 0.65) * 2.8;
+      posAttr.setZ(i, zDisp);
+
+      // SPHEREx False-Color Gradient Mapping (0.75 - 5.0 µm infrared bands)
+      if (totalFlux < 0.25) {
+        const t = totalFlux / 0.25;
+        fluxColors[i * 3] = 0.05 + 0.1 * t;
+        fluxColors[i * 3 + 1] = 0.1 + 0.55 * t;
+        fluxColors[i * 3 + 2] = 0.35 + 0.55 * t;
+      } else if (totalFlux < 0.8) {
+        const t = (totalFlux - 0.25) / 0.55;
+        fluxColors[i * 3] = 0.15 + 0.85 * t;
+        fluxColors[i * 3 + 1] = 0.65 + 0.25 * t;
+        fluxColors[i * 3 + 2] = 0.9 - 0.7 * t;
+      } else {
+        const t = Math.min(1.0, (totalFlux - 0.8) / 0.7);
+        fluxColors[i * 3] = 1.0;
+        fluxColors[i * 3 + 1] = 0.9 + 0.1 * t;
+        fluxColors[i * 3 + 2] = 0.2 + 0.8 * t;
+      }
+    }
+    posAttr.needsUpdate = true;
+    fluxGeo.setAttribute('color', new THREE.BufferAttribute(fluxColors, 3));
+    fluxGeo.computeVertexNormals();
+
+    const fluxMat = new THREE.MeshStandardMaterial({
+      vertexColors: true,
+      side: THREE.DoubleSide,
+      roughness: 0.35,
+      metalness: 0.3,
+      transparent: true,
+      opacity: 0.92,
+    });
+    const fluxMesh = new THREE.Mesh(fluxGeo, fluxMat);
+    telescopeImageReliefGroup.add(fluxMesh);
+
+    // Isophote wireframe contour overlay
+    const wireGeo = new THREE.WireframeGeometry(fluxGeo);
+    const wireMat = new THREE.LineBasicMaterial({
+      color: 0x00e5ff,
+      transparent: true,
+      opacity: 0.22,
+      blending: THREE.AdditiveBlending,
+    });
+    const wireMesh = new THREE.LineSegments(wireGeo, wireMat);
+    telescopeImageReliefGroup.add(wireMesh);
+
+    // Multi-Epoch Tomography Stack: Epoch A and Epoch B baseline planes
+    const sliceGeo = new THREE.PlaneGeometry(gridW, gridH);
+    const epochAMat = new THREE.MeshBasicMaterial({
+      color: 0x0088ff,
+      transparent: true,
+      opacity: 0.12,
+      side: THREE.DoubleSide,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    });
+    const epochAMesh = new THREE.Mesh(sliceGeo, epochAMat);
+    epochAMesh.position.z = -1.2;
+    telescopeImageReliefGroup.add(epochAMesh);
+
+    const epochBMat = new THREE.MeshBasicMaterial({
+      color: 0xffaa00,
+      transparent: true,
+      opacity: 0.12,
+      side: THREE.DoubleSide,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    });
+    const epochBMesh = new THREE.Mesh(sliceGeo, epochBMat);
+    epochBMesh.position.z = -2.4;
+    telescopeImageReliefGroup.add(epochBMesh);
+
+    // Candidate Transient Multi-Epoch Laser Cursor
+    const beaconPts = [
+      new THREE.Vector3(0.12 * (gridW / 2), 0.10 * (gridH / 2), -2.6),
+      new THREE.Vector3(0.12 * (gridW / 2), 0.10 * (gridH / 2), 3.2),
+    ];
+    const beaconGeo = new THREE.BufferGeometry().setFromPoints(beaconPts);
+    const beaconMat = new THREE.LineBasicMaterial({
+      color: 0x00ffcc,
+      blending: THREE.AdditiveBlending,
+    });
+    const beaconLine = new THREE.Line(beaconGeo, beaconMat);
+    telescopeImageReliefGroup.add(beaconLine);
+
+    // Holographic Perimeter Frame with SPHEREx Field Markings
+    const frameGeo = new THREE.EdgesGeometry(new THREE.PlaneGeometry(gridW + 0.2, gridH + 0.2));
+    const frameMat = new THREE.LineBasicMaterial({
+      color: 0x38bdf8,
+      transparent: true,
+      opacity: 0.75,
+      blending: THREE.AdditiveBlending,
+    });
+    const frameLine = new THREE.LineSegments(frameGeo, frameMat);
+    telescopeImageReliefGroup.add(frameLine);
+
+    // --- 2.8 SPHEREx 3D Optical Teardown Subsystem ---
+    // Follows the teardown skill: "The part doing the work opens up. Isolate it, cut it, x-ray it."
+    const teardownGroup = new THREE.Group();
+    spacecraftGroup.add(teardownGroup);
+
+    // 1. Primary Mirror (20 cm f/3.0 TMA concave mirror with authentic gold coating)
+    const primaryGeo = new THREE.CylinderGeometry(0.38, 0.38, 0.05, 32);
+    const primaryMat = new THREE.MeshStandardMaterial({
+      color: 0xffd700,
+      metalness: 0.95,
+      roughness: 0.15,
+      transparent: true,
+      opacity: 0.9,
+    });
+    const primaryMirror = new THREE.Mesh(primaryGeo, primaryMat);
+    primaryMirror.position.set(0, 0.45, 0);
+    teardownGroup.add(primaryMirror);
+
+    // 2. Secondary Fold Mirror (mounted on spider struts)
+    const secGeo = new THREE.CylinderGeometry(0.14, 0.14, 0.03, 24);
+    const secMat = new THREE.MeshStandardMaterial({
+      color: 0xffe066,
+      metalness: 0.92,
+      roughness: 0.2,
+      transparent: true,
+      opacity: 0.9,
+    });
+    const secMirror = new THREE.Mesh(secGeo, secMat);
+    secMirror.position.set(0, 0.95, 0);
+    teardownGroup.add(secMirror);
+
+    // Spider struts supporting secondary mirror
+    const strutMat = new THREE.LineBasicMaterial({ color: 0x94a3b8, transparent: true, opacity: 0.7 });
+    const strutPts = [
+      new THREE.Vector3(-0.35, 0.95, 0), new THREE.Vector3(0.35, 0.95, 0),
+      new THREE.Vector3(0, 0.95, -0.35), new THREE.Vector3(0, 0.95, 0.35),
+    ];
+    const strutGeo = new THREE.BufferGeometry().setFromPoints(strutPts);
+    const struts = new THREE.LineSegments(strutGeo, strutMat);
+    teardownGroup.add(struts);
+
+    // 3. Dichroic Beamsplitter Crystal
+    const dichroicGeo = new THREE.BoxGeometry(0.18, 0.18, 0.18);
+    const dichroicMat = new THREE.MeshPhysicalMaterial({
+      color: 0x38bdf8,
+      transmission: 0.85,
+      opacity: 1.0,
+      transparent: true,
+      roughness: 0.1,
+      ior: 1.5,
+    });
+    const dichroic = new THREE.Mesh(dichroicGeo, dichroicMat);
+    dichroic.position.set(0, 0.25, 0);
+    dichroic.rotation.x = Math.PI / 4;
+    teardownGroup.add(dichroic);
+
+    // 4. Six Focal Plane Arrays (FPAs) with 6 LVF Bands
+    const fpaColors = [0x7000ff, 0x00c8ff, 0x00ff88, 0xffbb00, 0xff5500, 0xff0044];
+    const fpaMeshes: THREE.Mesh[] = [];
+    fpaColors.forEach((color, idx) => {
+      const fpaGeo = new THREE.BoxGeometry(0.12, 0.02, 0.12);
+      const fpaMat = new THREE.MeshStandardMaterial({
+        color,
+        emissive: color,
+        emissiveIntensity: 0.4,
+        roughness: 0.4,
+      });
+      const fpa = new THREE.Mesh(fpaGeo, fpaMat);
+      const ang = (idx / 6) * Math.PI * 2;
+      fpa.position.set(Math.cos(ang) * 0.28, 0.12, Math.sin(ang) * 0.28);
+      teardownGroup.add(fpa);
+      fpaMeshes.push(fpa);
+    });
+
+    // 5. Internal Optical Light Path Rays
+    const rayPathPts = [
+      new THREE.Vector3(0, 1.15, 0), new THREE.Vector3(0, 0.45, 0), // aperture to primary
+      new THREE.Vector3(0, 0.45, 0), new THREE.Vector3(0, 0.95, 0), // primary to secondary
+      new THREE.Vector3(0, 0.95, 0), new THREE.Vector3(0, 0.25, 0), // secondary to dichroic
+    ];
+    fpaColors.forEach((_, idx) => {
+      const ang = (idx / 6) * Math.PI * 2;
+      rayPathPts.push(
+        new THREE.Vector3(0, 0.25, 0),
+        new THREE.Vector3(Math.cos(ang) * 0.28, 0.12, Math.sin(ang) * 0.28)
+      );
+    });
+    const rayPathGeo = new THREE.BufferGeometry().setFromPoints(rayPathPts);
+    const rayPathMat = new THREE.LineBasicMaterial({
+      color: 0xffd700,
+      transparent: true,
+      opacity: 0.8,
+      blending: THREE.AdditiveBlending,
+    });
+    const internalRays = new THREE.LineSegments(rayPathGeo, rayPathMat);
+    teardownGroup.add(internalRays);
+
+    // Initial state: teardown hidden until toggled
+    teardownGroup.visible = false;
+    let teardownFactor = 0.0;
+
     // 85° Solar Exclusion Cone (Cryogenic Thermal Avoidance Frustum)
-    // Points toward directional sunlight vector, truncated at r=20 to completely avoid intersecting the spacecraft!
     const sunVector = new THREE.Vector3(80, 50, 100).normalize();
     const coneLength = 75;
     const rInner = 20 * Math.tan((85 * Math.PI) / 360);
@@ -298,13 +711,14 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
     earthOrbitGroup.add(atmoMesh);
 
     // Load NASA SPHEREx GLTF Model
+    let spherexModel: THREE.Group | null = null;
     const gltfLoader = new GLTFLoader();
     gltfLoader.load(
       '/models/spherex/spherex.gltf',
       (gltf) => {
-        const model = gltf.scene;
-        model.scale.set(2.4, 2.4, 2.4);
-        model.traverse((child) => {
+        spherexModel = gltf.scene;
+        spherexModel.scale.set(2.4, 2.4, 2.4);
+        spherexModel.traverse((child) => {
           if ((child as THREE.Mesh).isMesh) {
             const m = child as THREE.Mesh;
             if (m.material) {
@@ -314,18 +728,17 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
             }
           }
         });
-        spacecraftGroup.add(model);
+        spacecraftGroup.add(spherexModel);
       },
       undefined,
       (err) => console.warn('NASA SPHEREx GLTF model load error:', err)
     );
 
-    // --- 3. Milky Way Great Circle Dust Band ---
+    // --- 3. Milky Way Great Circle Dust Band (Using Circular Dust Particle Sprites) ---
     const mwCount = 9000;
     const mwPositions = new Float32Array(mwCount * 3);
     const mwColors = new Float32Array(mwCount * 3);
 
-    // Galactic Pole constants
     const alphaG = (192.85948 * Math.PI) / 180;
     const deltaG = (27.12825 * Math.PI) / 180;
     const ngp = new THREE.Vector3(
@@ -334,13 +747,11 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
       Math.cos(deltaG) * Math.sin(alphaG)
     );
 
-    // Any vector orthogonal to NGP
     const gU = new THREE.Vector3(0, 1, 0).cross(ngp).normalize();
     const gV = ngp.clone().cross(gU).normalize();
 
     for (let i = 0; i < mwCount; i++) {
       const angle = Math.random() * Math.PI * 2;
-      // Gaussian scatter around galactic latitude
       const bRad = (Math.random() - 0.5) * (Math.random() - 0.5) * 0.45;
       const cosB = Math.cos(bRad);
       const sinB = Math.sin(bRad);
@@ -358,42 +769,43 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
       mwPositions[i * 3 + 1] = dir.y;
       mwPositions[i * 3 + 2] = dir.z;
 
-      // Color palette: soft violet, cyan-blue, and cosmic gold
       const t = Math.random();
       if (t < 0.4) {
         mwColors[i * 3] = 0.45;
         mwColors[i * 3 + 1] = 0.55;
-        mwColors[i * 3 + 2] = 0.95; // Blue
+        mwColors[i * 3 + 2] = 0.95;
       } else if (t < 0.75) {
         mwColors[i * 3] = 0.75;
         mwColors[i * 3 + 1] = 0.45;
-        mwColors[i * 3 + 2] = 0.9; // Purple
+        mwColors[i * 3 + 2] = 0.9;
       } else {
         mwColors[i * 3] = 0.95;
         mwColors[i * 3 + 1] = 0.75;
-        mwColors[i * 3 + 2] = 0.45; // Amber
+        mwColors[i * 3 + 2] = 0.45;
       }
     }
 
     const mwGeo = new THREE.BufferGeometry();
     mwGeo.setAttribute('position', new THREE.BufferAttribute(mwPositions, 3));
     mwGeo.setAttribute('color', new THREE.BufferAttribute(mwColors, 3));
+    // Soft circular dust sprite with additive blending and depthWrite=false (NO square boxes!)
     const mwMat = new THREE.PointsMaterial({
-      size: 0.65,
+      size: 1.6,
+      map: dustSpriteTexture,
       vertexColors: true,
       transparent: true,
-      opacity: 0.45,
+      opacity: 0.55,
       blending: THREE.AdditiveBlending,
+      depthWrite: false,
     });
     const mwPoints = new THREE.Points(mwGeo, mwMat);
     scene.add(mwPoints);
 
-    // --- 4. Real Star Field (Bright Stars + Background Catalog) ---
+    // --- 4. Real Star Field (Airy-Disk Star Sprites + Background Catalog) ---
     const bgStarCount = 2000;
     const totalStarCount = BRIGHT_STARS.length + bgStarCount;
     const starPositions = new Float32Array(totalStarCount * 3);
     const starColors = new Float32Array(totalStarCount * 3);
-    const starSizes = new Float32Array(totalStarCount);
 
     // Bright catalog stars
     BRIGHT_STARS.forEach((star, idx) => {
@@ -406,10 +818,6 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
       starColors[idx * 3] = color.r;
       starColors[idx * 3 + 1] = color.g;
       starColors[idx * 3 + 2] = color.b;
-
-      // Brightness scaling from apparent magnitude
-      const magScale = Math.max(1.8, (3.5 - star.mag) * 0.8);
-      starSizes[idx] = magScale;
     });
 
     // Background random stars
@@ -427,21 +835,45 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
       starColors[idx * 3] = brightness * 0.9;
       starColors[idx * 3 + 1] = brightness * 0.95;
       starColors[idx * 3 + 2] = brightness;
-      starSizes[idx] = 0.5 + Math.random() * 0.7;
     }
 
     const starGeo = new THREE.BufferGeometry();
     starGeo.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
     starGeo.setAttribute('color', new THREE.BufferAttribute(starColors, 3));
+    // Authentic Airy-disk Gaussian star sprite with cross diffraction spikes (NO square boxes!)
     const starMat = new THREE.PointsMaterial({
-      size: 1.2,
+      size: 2.2,
+      map: starSpriteTexture,
       vertexColors: true,
       transparent: true,
-      opacity: 0.85,
+      opacity: 0.95,
       blending: THREE.AdditiveBlending,
+      depthWrite: false,
     });
     const starPoints = new THREE.Points(starGeo, starMat);
     scene.add(starPoints);
+
+    // Optical Diffraction Flares on Prominent Navigation Stars (using Solar System Scope flare)
+    const brightFlareGroup = new THREE.Group();
+    scene.add(brightFlareGroup);
+    BRIGHT_STARS.forEach((star) => {
+      if (star.mag <= 2.2) {
+        const fMat = new THREE.SpriteMaterial({
+          map: flareTexture,
+          color: new THREE.Color(star.colorHex),
+          transparent: true,
+          opacity: Math.max(0.35, (2.6 - star.mag) * 0.4),
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+        });
+        const flareSprite = new THREE.Sprite(fMat);
+        const pos = icrsToUnitVector(star.ra, star.dec, sphereRadius * 0.982);
+        flareSprite.position.copy(pos);
+        const flareScale = Math.max(2.4, (2.8 - star.mag) * 2.5);
+        flareSprite.scale.set(flareScale, flareScale, 1);
+        brightFlareGroup.add(flareSprite);
+      }
+    });
 
     // --- 5. Coordinate Grids (Equatorial, Ecliptic, Galactic) ---
     const gridGroup = new THREE.Group();
@@ -468,15 +900,15 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
     const equatorLine = new THREE.Line(eqGeo, eqMat);
     gridGroup.add(equatorLine);
 
-    // 5b. Dec parallels (+-30°, +-60°)
+    // 5b. Dec parallels (±30°, ±60°)
     [-60, -30, 30, 60].forEach((decDeg) => {
+      const dRad = (decDeg * Math.PI) / 180;
+      const rP = sphereRadius * 0.99 * Math.cos(dRad);
+      const yP = sphereRadius * 0.99 * Math.sin(dRad);
       const dPts: THREE.Vector3[] = [];
-      const decRad = (decDeg * Math.PI) / 180;
-      const rDec = sphereRadius * 0.99 * Math.cos(decRad);
-      const yDec = sphereRadius * 0.99 * Math.sin(decRad);
       for (let i = 0; i <= 90; i++) {
         const a = (i / 90) * Math.PI * 2;
-        dPts.push(new THREE.Vector3(rDec * Math.cos(a), yDec, rDec * Math.sin(a)));
+        dPts.push(new THREE.Vector3(rP * Math.cos(a), yP, rP * Math.sin(a)));
       }
       const dGeo = new THREE.BufferGeometry().setFromPoints(dPts);
       const dMat = new THREE.LineBasicMaterial({
@@ -487,11 +919,11 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
       gridGroup.add(new THREE.Line(dGeo, dMat));
     });
 
-    // 5c. RA meridians (every 2 hours = 30°)
+    // 5c. RA meridians (every 2h = 30°)
     for (let h = 0; h < 24; h += 2) {
-      const mPts: THREE.Vector3[] = [];
       const raDeg = h * 15;
-      for (let d = -80; d <= 80; d += 2) {
+      const mPts: THREE.Vector3[] = [];
+      for (let d = -80; d <= 80; d += 5) {
         mPts.push(icrsToUnitVector(raDeg, d, sphereRadius * 0.99));
       }
       const mGeo = new THREE.BufferGeometry().setFromPoints(mPts);
@@ -503,166 +935,185 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
       gridGroup.add(new THREE.Line(mGeo, mMat));
     }
 
-    // 5d. Ecliptic Plane (Gold great circle, inclined 23.44°)
+    // --- 5d. Ecliptic Plane Great Circle (Gold) ---
     const eclipticGroup = new THREE.Group();
     scene.add(eclipticGroup);
     const ecPts: THREE.Vector3[] = [];
-    const epsRad = (23.4392911 * Math.PI) / 180;
+    const eps = (23.43929 * Math.PI) / 180;
     for (let i = 0; i <= 180; i++) {
       const l = (i / 180) * Math.PI * 2;
-      const x = sphereRadius * 0.988 * Math.cos(l);
-      const y = sphereRadius * 0.988 * Math.sin(l) * Math.sin(epsRad);
-      const z = sphereRadius * 0.988 * Math.sin(l) * Math.cos(epsRad);
-      ecPts.push(new THREE.Vector3(x, y, z));
+      const xE = sphereRadius * 0.988 * Math.cos(l);
+      const yE = sphereRadius * 0.988 * Math.sin(l) * Math.sin(eps);
+      const zE = sphereRadius * 0.988 * Math.sin(l) * Math.cos(eps);
+      ecPts.push(new THREE.Vector3(xE, yE, zE));
     }
     const ecGeo = new THREE.BufferGeometry().setFromPoints(ecPts);
     const ecMat = new THREE.LineBasicMaterial({
       color: 0xffd166,
       transparent: true,
-      opacity: 0.35,
+      opacity: 0.45,
     });
     eclipticGroup.add(new THREE.Line(ecGeo, ecMat));
 
-    // 5e. Galactic Plane (Purple great circle, b = 0)
+    // --- 5e. Galactic Plane Great Circle (Purple) ---
     const galacticGroup = new THREE.Group();
     scene.add(galacticGroup);
     const galPts: THREE.Vector3[] = [];
     for (let i = 0; i <= 180; i++) {
       const a = (i / 180) * Math.PI * 2;
-      const pt = gU
+      const p = gU
         .clone()
         .multiplyScalar(Math.cos(a))
         .add(gV.clone().multiplyScalar(Math.sin(a)))
         .normalize()
         .multiplyScalar(sphereRadius * 0.986);
-      galPts.push(pt);
+      galPts.push(p);
     }
     const galGeo = new THREE.BufferGeometry().setFromPoints(galPts);
     const galMat = new THREE.LineBasicMaterial({
       color: 0x9d4edd,
       transparent: true,
-      opacity: 0.4,
+      opacity: 0.45,
     });
     galacticGroup.add(new THREE.Line(galGeo, galMat));
 
-    // --- 6. SPHEREx Scan Path (Animated Ring) ---
+    // --- 6. SPHEREx Scan Cadence Great Circle (Animated Precessing Ring) ---
     const scanGroup = new THREE.Group();
     scene.add(scanGroup);
-    const scanRadius = sphereRadius * 0.982;
     const scanPts: THREE.Vector3[] = [];
-    for (let i = 0; i <= 120; i++) {
-      const a = (i / 120) * Math.PI * 2;
-      scanPts.push(new THREE.Vector3(scanRadius * Math.cos(a), 0, scanRadius * Math.sin(a)));
+    for (let i = 0; i <= 180; i++) {
+      const a = (i / 180) * Math.PI * 2;
+      scanPts.push(
+        new THREE.Vector3(
+          sphereRadius * 0.982 * Math.cos(a),
+          sphereRadius * 0.982 * Math.sin(a),
+          0
+        )
+      );
     }
     const scanGeo = new THREE.BufferGeometry().setFromPoints(scanPts);
     const scanMat = new THREE.LineBasicMaterial({
-      color: 0xff6b35,
+      color: 0xff6b6b,
       transparent: true,
-      opacity: 0.65,
-      linewidth: 2,
+      opacity: 0.5,
     });
-    const scanRing = new THREE.Line(scanGeo, scanMat);
-    // Align scan ring with SPHEREx sun-synchronous orbit
-    scanRing.rotation.x = Math.PI / 2.2;
-    scanGroup.add(scanRing);
+    scanGroup.add(new THREE.Line(scanGeo, scanMat));
 
-    // --- 7. Solar System Orrery (Kepler Orbits & Solar System Scope Photorealistic Planets) ---
+    // --- 7. Solar System Orrery with Solar System Scope Authentic Textures ---
     const orreryGroup = new THREE.Group();
     scene.add(orreryGroup);
+    const ORRERY_SCALE = 18.0;
 
-    // Central Photorealistic Sun with Luminous Dynamic Corona
-    const sunGeo = new THREE.SphereGeometry(2.0, 48, 48);
+    // Central Sun with Solar System Scope Photosphere
+    const sunGeo = new THREE.SphereGeometry(1.5, 48, 48);
     const sunMat = new THREE.MeshBasicMaterial({
       map: planetTextures.Sun,
     });
     const sunMesh = new THREE.Mesh(sunGeo, sunMat);
     orreryGroup.add(sunMesh);
 
-    // Corona flare sprites
-    const coronaTex = createSunCoronaTexture();
+    // Multi-layered Solar Corona and Atmospheric Glow
+    const coronaTexture = createSunCoronaTexture();
     const innerCoronaMat = new THREE.SpriteMaterial({
-      map: coronaTex,
-      color: 0xfff6cf,
-      transparent: true,
+      map: coronaTexture,
       blending: THREE.AdditiveBlending,
-      opacity: 0.9,
+      color: 0xfff0c0,
+      transparent: true,
+      opacity: 0.95,
+      depthWrite: false,
     });
     const innerCorona = new THREE.Sprite(innerCoronaMat);
-    innerCorona.scale.set(7.5, 7.5, 1.0);
-    sunMesh.add(innerCorona);
+    innerCorona.scale.set(7.5, 7.5, 1);
+    orreryGroup.add(innerCorona);
 
     const outerCoronaMat = new THREE.SpriteMaterial({
-      map: coronaTex,
-      color: 0xff9922,
-      transparent: true,
+      map: coronaTexture,
       blending: THREE.AdditiveBlending,
-      opacity: 0.45,
+      color: 0xffa040,
+      transparent: true,
+      opacity: 0.55,
+      depthWrite: false,
     });
     const outerCorona = new THREE.Sprite(outerCoronaMat);
-    outerCorona.scale.set(19.0, 19.0, 1.0);
-    sunMesh.add(outerCorona);
+    outerCorona.scale.set(16.0, 16.0, 1);
+    orreryGroup.add(outerCorona);
 
-    // Central PointLight casting authentic solar illumination onto planetary bodies
-    const sunLight = new THREE.PointLight(0xfff6e5, 3.8, 500, 0.4);
-    sunLight.position.set(0, 0, 0);
-    orreryGroup.add(sunLight);
+    // Add Solar System Scope Central PointLight
+    const sunPointLight = new THREE.PointLight(0xfff6ea, 3.8, 500);
+    sunPointLight.position.set(0, 0, 0);
+    orreryGroup.add(sunPointLight);
 
-    const ORRERY_SCALE = 4.8;
-
-    // Planetary orbit lines and realistic textured planet meshes
-    interface PlanetMeshEntry {
+    // Build Keplerian Planetary Bodies
+    interface PlanetMeshItem {
       mesh: THREE.Mesh;
       orbit: (typeof PLANET_ORBITS)[0];
       clouds?: THREE.Mesh;
       rings?: THREE.Mesh;
     }
-    const planetMeshes: PlanetMeshEntry[] = [];
+    const planetMeshes: PlanetMeshItem[] = [];
 
     PLANET_ORBITS.forEach((orbit) => {
+      // Orbital Ellipse Path
       const pts: THREE.Vector3[] = [];
-      for (let m = 0; m <= 360; m += 3) {
+      const numPts = 128;
+      for (let step = 0; step <= numPts; step++) {
+        const m = (step / numPts) * 360;
         pts.push(
-          keplerToCartesian(orbit.a, orbit.e, orbit.i, orbit.omega, orbit.Omega, m, ORRERY_SCALE)
+          keplerToCartesian(
+            orbit.a,
+            orbit.e,
+            orbit.i,
+            orbit.omega,
+            orbit.Omega,
+            m,
+            ORRERY_SCALE
+          )
         );
       }
       const oGeo = new THREE.BufferGeometry().setFromPoints(pts);
       const oMat = new THREE.LineBasicMaterial({
-        color: orbit.color,
+        color: new THREE.Color(orbit.color),
         transparent: true,
         opacity: 0.28,
       });
       orreryGroup.add(new THREE.Line(oGeo, oMat));
 
-      const pGeo = new THREE.SphereGeometry(orbit.size * 0.65, 32, 32);
-      const tex = planetTextures[orbit.name] || planetTextures.Mercury;
-      const pMat = new THREE.MeshStandardMaterial({
-        map: tex,
-        roughness: orbit.name === 'Earth' ? 0.6 : 0.75,
-        metalness: 0.05,
-      });
+      // Textured Planetary Sphere
+      const tex = planetTextures[orbit.name];
+      const pGeo = new THREE.SphereGeometry(orbit.size, 32, 24);
+      const pMat = tex
+        ? new THREE.MeshStandardMaterial({
+            map: tex,
+            roughness: 0.65,
+            metalness: 0.05,
+          })
+        : new THREE.MeshStandardMaterial({
+            color: new THREE.Color(orbit.color),
+            roughness: 0.5,
+          });
       const pMesh = new THREE.Mesh(pGeo, pMat);
       orreryGroup.add(pMesh);
 
       let pClouds: THREE.Mesh | undefined;
       let pRings: THREE.Mesh | undefined;
 
-      // Realistic Earth clouds in Orrery
+      // Earth Cloud Layer
       if (orbit.name === 'Earth') {
-        const cGeo = new THREE.SphereGeometry(orbit.size * 0.665, 32, 32);
-        const cMat = new THREE.MeshStandardMaterial({
+        const cloudsGeo = new THREE.SphereGeometry(orbit.size * 1.025, 32, 24);
+        const cloudsMat = new THREE.MeshStandardMaterial({
           map: earthCloudsTexture,
           transparent: true,
-          opacity: 0.75,
-          blending: THREE.NormalBlending,
+          opacity: 0.65,
+          blending: THREE.AdditiveBlending,
         });
-        pClouds = new THREE.Mesh(cGeo, cMat);
+        pClouds = new THREE.Mesh(cloudsGeo, cloudsMat);
         pMesh.add(pClouds);
       }
 
-      // Realistic 3D Saturn Rings with custom radial UV projection
+      // Saturn 3D Rings
       if (orbit.name === 'Saturn') {
-        const ringInner = orbit.size * 0.85;
-        const ringOuter = orbit.size * 1.95;
+        const ringInner = orbit.size * 1.35;
+        const ringOuter = orbit.size * 2.45;
         const ringGeo = new THREE.RingGeometry(ringInner, ringOuter, 64);
         const posAttr = ringGeo.attributes.position;
         const uvAttr = ringGeo.attributes.uv;
@@ -716,7 +1167,16 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
     targetGroup.add(ring1);
     targetGroup.add(ring2);
 
-    // Hypothetical Planet X marker (magenta), placed at its sky direction for the selected date
+    // 3D Astronomical Flux Relief Mesh at Target Coordinates (visible in Sky Survey mode)
+    const skyTargetReliefGroup = new THREE.Group();
+    targetGroup.add(skyTargetReliefGroup);
+    const skyFluxMesh = new THREE.Mesh(fluxGeo, fluxMat);
+    skyTargetReliefGroup.add(skyFluxMesh);
+    const skyWireMesh = new THREE.LineSegments(wireGeo, wireMat);
+    skyTargetReliefGroup.add(skyWireMesh);
+    skyTargetReliefGroup.scale.set(0.65, 0.65, 0.65);
+
+    // Hypothetical Planet X marker (magenta)
     const planetXGroup = new THREE.Group();
     planetXGroup.visible = false;
     scene.add(planetXGroup);
@@ -750,7 +1210,7 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
       candidateMeshes.push({ mesh: cMesh, data: cand });
     });
 
-    // --- 9. Raycasting Interaction ---
+    // --- 9. Raycasting for Interactive Selection ---
     const raycaster = new THREE.Raycaster();
     raycaster.params.Points = { threshold: 1.5 };
     const mouse = new THREE.Vector2();
@@ -762,83 +1222,69 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
 
       raycaster.setFromCamera(mouse, camera);
 
-      // Planet hover: name, time and orbital speed (screen-space pick, planets are tiny)
-      if (storeValuesRef.current.showOrrery) {
-        const px = e.clientX - rect.left;
-        const py = e.clientY - rect.top;
-        let best: { d: number; mesh: THREE.Mesh; orbit: (typeof PLANET_ORBITS)[0] } | null = null;
-        planetMeshes.forEach(({ mesh, orbit }) => {
-          const ndc = mesh.position.clone().project(camera);
-          if (ndc.z > 1) return; // behind camera
-          const sx = ((ndc.x + 1) / 2) * rect.width;
-          const sy = ((1 - ndc.y) / 2) * rect.height;
-          const d = Math.hypot(sx - px, sy - py);
-          if (d < 18 && (!best || d < best.d)) best = { d, mesh, orbit };
-        });
-        if (best) {
-          const { mesh, orbit } = best as { d: number; mesh: THREE.Mesh; orbit: (typeof PLANET_ORBITS)[0] };
-          const rAu = mesh.position.length() / ORRERY_SCALE;
-          // vis-viva: v = 29.7847 km/s * sqrt(2/r - 1/a)  (1 AU circular speed)
-          const vKms = 29.7847 * Math.sqrt(Math.max(0, 2 / rAu - 1 / orbit.a));
-          const when = new Date().toISOString().replace('T', ' ').slice(0, 19) + ' UTC';
-          const dir = vectorToIcrs(mesh.position.clone().normalize().multiplyScalar(sphereRadius));
-          setHoveredObject({
-            name: orbit.name,
-            ra: dir.ra,
-            dec: dir.dec,
-            type: 'Planet',
-            extra: `${when} | Speed: ${vKms.toFixed(2)} km/s | Sun dist: ${rAu.toFixed(3)} AU | Period: ${(orbit.periodDays / 365.25).toFixed(2)} yr`,
-          });
-          renderer.domElement.style.cursor = 'pointer';
-          return;
-        }
-      }
-
-      // Check candidate hover
+      // Check Candidates
       const candHits = raycaster.intersectObjects(candidateMeshes.map((c) => c.mesh));
       if (candHits.length > 0) {
-        const hitMesh = candHits[0].object as THREE.Mesh;
-        const candData = candidateMeshes.find((c) => c.mesh === hitMesh)?.data;
-        if (candData) {
+        const hit = candidateMeshes.find((c) => c.mesh === candHits[0].object);
+        if (hit) {
           setHoveredObject({
-            name: `${candData.id} (${candData.type})`,
-            ra: candData.ra,
-            dec: candData.dec,
+            name: `${hit.data.type} (${(hit.data.confidence * 100).toFixed(0)}% conf)`,
+            ra: hit.data.ra,
+            dec: hit.data.dec,
             type: 'Candidate',
-            extra: `Confidence: ${(candData.confidence * 100).toFixed(0)}%`,
+            extra: `ID: ${hit.data.id} | Class: ${hit.data.type}`,
           });
           renderer.domElement.style.cursor = 'pointer';
           return;
         }
       }
 
-      // Check bright stars hover
+      // Check Planets
+      const planetHitObjects = planetMeshes.map((p) => p.mesh);
+      const planetHits = raycaster.intersectObjects(planetHitObjects);
+      if (planetHits.length > 0) {
+        const hitP = planetMeshes.find((p) => p.mesh === planetHits[0].object);
+        if (hitP) {
+          const icrs = vectorToIcrs(planetHits[0].point);
+          setHoveredObject({
+            name: `${hitP.orbit.name} (Planet)`,
+            ra: icrs.ra,
+            dec: icrs.dec,
+            type: 'Planet',
+            extra: `Semi-major axis: ${hitP.orbit.a} AU | Period: ${hitP.orbit.periodDays.toFixed(1)} days`,
+          });
+          renderer.domElement.style.cursor = 'pointer';
+          return;
+        }
+      }
+
+      // Check Stars
       const starHits = raycaster.intersectObject(starPoints);
       if (starHits.length > 0 && starHits[0].index !== undefined) {
-        const starIdx = starHits[0].index;
-        if (starIdx < BRIGHT_STARS.length) {
-          const star = BRIGHT_STARS[starIdx];
+        const idx = starHits[0].index;
+        if (idx < BRIGHT_STARS.length) {
+          const s = BRIGHT_STARS[idx];
           setHoveredObject({
-            name: `${star.name} (${star.spectralType})`,
-            ra: star.ra,
-            dec: star.dec,
+            name: `${s.name} (${s.spectralType})`,
+            ra: s.ra,
+            dec: s.dec,
             type: 'Star',
-            extra: `V-Mag: ${star.mag}`,
+            extra: `Visual Mag: ${s.mag.toFixed(2)} | Color: ${s.colorHex}`,
           });
           renderer.domElement.style.cursor = 'pointer';
           return;
         }
       }
 
-      // Check empty sphere intersection for coordinates
+      // Hovering general sky sphere
       const sphereHits = raycaster.intersectObject(sphereMesh);
       if (sphereHits.length > 0) {
-        const hitPt = sphereHits[0].point;
-        const coords = vectorToIcrs(hitPt);
+        const pt = sphereHits[0].point;
+        const icrs = vectorToIcrs(pt);
         setHoveredObject({
           name: 'Celestial Coordinate',
-          ra: coords.ra,
-          dec: coords.dec,
+          ra: icrs.ra,
+          dec: icrs.dec,
           type: 'Point',
         });
         renderer.domElement.style.cursor = 'crosshair';
@@ -849,64 +1295,68 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
       renderer.domElement.style.cursor = 'default';
     };
 
-    const handleClick = (e: MouseEvent) => {
+    const handlePointerDown = (e: MouseEvent) => {
+      if (e.button !== 0) return; // Left click only
       const rect = renderer.domElement.getBoundingClientRect();
       mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
       mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
 
       raycaster.setFromCamera(mouse, camera);
 
-      // Click on candidate
+      // Check candidate click
       const candHits = raycaster.intersectObjects(candidateMeshes.map((c) => c.mesh));
       if (candHits.length > 0) {
-        const hitMesh = candHits[0].object as THREE.Mesh;
-        const candData = candidateMeshes.find((c) => c.mesh === hitMesh)?.data;
-        if (candData) {
-          setCoordinates(candData.ra, candData.dec, candData.id);
-          if (onCoordinateClick) onCoordinateClick(candData.ra, candData.dec);
+        const hit = candidateMeshes.find((c) => c.mesh === candHits[0].object);
+        if (hit) {
+          setCoordinates(hit.data.ra, hit.data.dec, `${hit.data.type} (${hit.data.id})`);
+          if (onCoordinateClick) onCoordinateClick(hit.data.ra, hit.data.dec);
           return;
         }
       }
 
-      // Click on celestial sphere
+      // Check star click
+      const starHits = raycaster.intersectObject(starPoints);
+      if (starHits.length > 0 && starHits[0].index !== undefined) {
+        const idx = starHits[0].index;
+        if (idx < BRIGHT_STARS.length) {
+          const s = BRIGHT_STARS[idx];
+          setCoordinates(s.ra, s.dec, s.name);
+          if (onCoordinateClick) onCoordinateClick(s.ra, s.dec);
+          return;
+        }
+      }
+
+      // Check sky sphere click
       const sphereHits = raycaster.intersectObject(sphereMesh);
       if (sphereHits.length > 0) {
-        const hitPt = sphereHits[0].point;
-        const coords = vectorToIcrs(hitPt);
-        setCoordinates(
-          Math.round(coords.ra * 10000) / 10000,
-          Math.round(coords.dec * 10000) / 10000
-        );
-        if (onCoordinateClick) {
-          onCoordinateClick(coords.ra, coords.dec);
-        }
+        const pt = sphereHits[0].point;
+        const icrs = vectorToIcrs(pt);
+        setCoordinates(icrs.ra, icrs.dec);
+        if (onCoordinateClick) onCoordinateClick(icrs.ra, icrs.dec);
       }
     };
 
     renderer.domElement.addEventListener('mousemove', handlePointerMove);
-    renderer.domElement.addEventListener('click', handleClick);
+    renderer.domElement.addEventListener('pointerdown', handlePointerDown);
 
-    // --- 10. Resize Observer ---
-    const resizeObserver = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        const { width, height } = entry.contentRect;
-        if (width === 0 || height === 0) return;
-        camera.aspect = width / height;
-        camera.updateProjectionMatrix();
-        renderer.setSize(width, height);
-      }
-    });
-    resizeObserver.observe(container);
-
-    // --- 11. Animation Loop ---
-    let animationId: number;
-    let clock = new THREE.Clock();
-    let lastViewMode = storeValuesRef.current.viewMode;
+    // --- 10. Animation & Render Loop ---
+    let reqId: number;
+    let lastTime = performance.now();
     let transitionFrames = 0;
+    let lastViewMode = storeValuesRef.current.viewMode;
 
     const animate = () => {
-      animationId = requestAnimationFrame(animate);
-      const elapsed = clock.getElapsedTime();
+      reqId = requestAnimationFrame(animate);
+      const now = performance.now();
+      const delta = (now - lastTime) / 1000;
+      lastTime = now;
+      const elapsed = now * 0.001;
+
+      // Detect View Mode Changes
+      if (storeValuesRef.current.viewMode !== lastViewMode) {
+        lastViewMode = storeValuesRef.current.viewMode;
+        transitionFrames = 45;
+      }
 
       // Update OrbitControls
       controls.autoRotate = storeValuesRef.current.autoRotate;
@@ -919,7 +1369,6 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
       gridGroup.visible = storeValuesRef.current.showEquatorialGrid;
       eclipticGroup.visible = storeValuesRef.current.showEclipticGrid;
       galacticGroup.visible = storeValuesRef.current.showGalacticPlane;
-      // In Spacecraft View Mode: Hide intersecting central orrery (Sun & inner orbits) so they never clip through the spacecraft!
       orreryGroup.visible = storeValuesRef.current.showOrrery && !isSpacecraftMode;
       earthOrbitGroup.visible = isSpacecraftMode;
       scanGroup.visible = storeValuesRef.current.showScanPath;
@@ -943,7 +1392,6 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
       if (storeValuesRef.current.showOrrery) {
         const jd = getJulianDate();
         planetMeshes.forEach(({ mesh, orbit, clouds }) => {
-          // Mean anomaly rate (deg/day)
           const mDeg = ((jd - 2451545.0) * (360.0 / orbit.periodDays)) % 360;
           const pos = keplerToCartesian(
             orbit.a,
@@ -972,6 +1420,9 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
       targetGroup.lookAt(new THREE.Vector3(0, 0, 0));
       targetGroup.visible = !isSpacecraftMode;
 
+      // 3D Image Relief at Target in Sky Survey Mode
+      skyTargetReliefGroup.visible = storeValuesRef.current.show3DImageRelief && !isSpacecraftMode;
+
       // Planet X sky marker
       const pxm = storeValuesRef.current.planetXMarker;
       planetXGroup.visible = !!pxm;
@@ -990,10 +1441,42 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
       const targetQuat = new THREE.Quaternion().setFromUnitVectors(modelAperture, targetDir);
       spacecraftGroup.quaternion.slerp(targetQuat, 0.06);
 
-      // Toggles for Boresight and Sun Exclusion Zone
+      // Toggles for Boresight, Frustum, 3D Image, and Sun Exclusion Cone
       boresightRay.visible = storeValuesRef.current.showBoresight;
       emitMesh.visible = storeValuesRef.current.showBoresight;
       sunExclusionCone.visible = storeValuesRef.current.showSunExclusion;
+      observationFrustumGroup.visible = storeValuesRef.current.showObservationVolume;
+      telescopeImageReliefGroup.visible = storeValuesRef.current.show3DImageRelief;
+
+      // Wavefront Pulse traveling down observation frustum
+      const pulseT = (elapsed * 0.35) % 1.0;
+      const pulseY = THREE.MathUtils.lerp(yEnd, yStart, pulseT);
+      const pulseFrac = (pulseY - yStart) / (yEnd - yStart);
+      const pW = THREE.MathUtils.lerp(hwBase, hwEnd, pulseFrac);
+      const pZ = THREE.MathUtils.lerp(hzBase, hzEnd, pulseFrac);
+      const pulsePts = [
+        new THREE.Vector3(pW, pulseY, pZ),
+        new THREE.Vector3(-pW, pulseY, pZ),
+        new THREE.Vector3(-pW, pulseY, -pZ),
+        new THREE.Vector3(pW, pulseY, -pZ),
+      ];
+      pulseRingGeo.setFromPoints(pulsePts);
+
+      // Smooth Teardown Exploded View Animation
+      const targetTeardown = storeValuesRef.current.showTeardown ? 1.0 : 0.0;
+      teardownFactor = THREE.MathUtils.lerp(teardownFactor, targetTeardown, 0.06);
+      teardownGroup.visible = teardownFactor > 0.01;
+      if (teardownGroup.visible) {
+        primaryMirror.position.y = 0.45 - teardownFactor * 0.35;
+        secMirror.position.y = 0.95 + teardownFactor * 0.45;
+        struts.position.y = teardownFactor * 0.45;
+        dichroic.position.y = 0.25 - teardownFactor * 0.15;
+        fpaMeshes.forEach((fpa, idx) => {
+          const ang = (idx / 6) * Math.PI * 2;
+          const r = 0.28 + teardownFactor * 0.35;
+          fpa.position.set(Math.cos(ang) * r, 0.12 - teardownFactor * 0.2, Math.sin(ang) * r);
+        });
+      }
 
       // View Mode Transitions: Sky Survey (wide) vs Spacecraft (close-up orbiting telescope)
       if (isSpacecraftMode) {
@@ -1004,7 +1487,7 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
         }
         controls.target.lerp(new THREE.Vector3(0, 0.2, 0), 0.06);
       } else {
-        controls.minDistance = 0.5; // no hard cap: can zoom right in on the Sun / planets
+        controls.minDistance = 0.5;
         controls.maxDistance = 320;
         if (transitionFrames > 0) {
           camera.position.lerp(new THREE.Vector3(0, 30, 160), 0.06);
@@ -1012,7 +1495,6 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
         }
         controls.target.lerp(new THREE.Vector3(0, 0, 0), 0.1);
       }
-
 
       // Pulse reticle
       const scale1 = 1.0 + Math.sin(elapsed * 3) * 0.08;
@@ -1029,16 +1511,24 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
       renderer.render(scene, camera);
     };
 
-    animate();
+    reqId = requestAnimationFrame(animate);
 
-    // --- 12. Cleanup on Unmount ---
+    // --- 11. Responsive Resize ---
+    const handleResize = () => {
+      if (!container) return;
+      camera.aspect = container.clientWidth / container.clientHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(container.clientWidth, container.clientHeight);
+    };
+    window.addEventListener('resize', handleResize);
+
+    // --- 12. Cleanup ---
     return () => {
-      cancelAnimationFrame(animationId);
-      resizeObserver.disconnect();
+      window.removeEventListener('resize', handleResize);
       renderer.domElement.removeEventListener('mousemove', handlePointerMove);
-      renderer.domElement.removeEventListener('click', handleClick);
+      renderer.domElement.removeEventListener('pointerdown', handlePointerDown);
+      cancelAnimationFrame(reqId);
 
-      controls.dispose();
       sphereGeo.dispose();
       sphereMat.dispose();
       mwGeo.dispose();

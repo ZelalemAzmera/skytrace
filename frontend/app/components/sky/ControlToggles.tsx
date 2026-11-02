@@ -13,6 +13,8 @@ import {
   Telescope,
   Compass,
   ShieldAlert,
+  Maximize2,
+  Box,
 } from 'lucide-react';
 
 export default function ControlToggles() {
@@ -21,6 +23,9 @@ export default function ControlToggles() {
     setViewMode,
     showSunExclusion,
     showBoresight,
+    show3DImageRelief,
+    showObservationVolume,
+    showTeardown,
     showEquatorialGrid,
     showEclipticGrid,
     showGalacticPlane,
@@ -37,6 +42,27 @@ export default function ControlToggles() {
       active: showBoresight,
       color: 'var(--accent-cyan)',
       icon: <Compass className="w-3.5 h-3.5" />,
+    },
+    {
+      key: 'showObservationVolume' as const,
+      label: '3D Optical Frustum (3.5°×7°)',
+      active: showObservationVolume,
+      color: '#38bdf8',
+      icon: <Maximize2 className="w-3.5 h-3.5" />,
+    },
+    {
+      key: 'show3DImageRelief' as const,
+      label: '3D Telescope Image Relief',
+      active: show3DImageRelief,
+      color: 'var(--accent-gold)',
+      icon: <Layers className="w-3.5 h-3.5" />,
+    },
+    {
+      key: 'showTeardown' as const,
+      label: '3D Optical Teardown',
+      active: showTeardown,
+      color: '#c084fc',
+      icon: <Box className="w-3.5 h-3.5" />,
     },
     {
       key: 'showSunExclusion' as const,

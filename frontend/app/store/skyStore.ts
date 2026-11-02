@@ -39,6 +39,9 @@ export interface SkyState {
   viewMode: 'sky' | 'spacecraft';
   showSunExclusion: boolean;
   showBoresight: boolean;
+  show3DImageRelief: boolean;
+  showObservationVolume: boolean;
+  showTeardown: boolean;
 
   // Hypothetical Planet X direction on the sky at the selected timeline time
   planetXMarker: { ra: number; dec: number; name: string } | null;
@@ -65,6 +68,9 @@ export interface SkyState {
       | 'autoRotate'
       | 'showSunExclusion'
       | 'showBoresight'
+      | 'show3DImageRelief'
+      | 'showObservationVolume'
+      | 'showTeardown'
   ) => void;
   reset: () => void;
 }
@@ -94,6 +100,9 @@ export const useSkyStore = create<SkyState>((set) => ({
   viewMode: 'sky',
   showSunExclusion: true,
   showBoresight: true,
+  show3DImageRelief: true,
+  showObservationVolume: true,
+  showTeardown: false,
 
   planetXMarker: null,
   setPlanetXMarker: (planetXMarker) => set({ planetXMarker }),
