@@ -63,57 +63,56 @@ function updateTargetBadgeCanvas(
   const h = canvas.height;
 
   // Outer Holographic Glow Background
-  ctx.fillStyle = 'rgba(6, 12, 28, 0.92)';
-  ctx.strokeStyle = '#00e5ff';
-  ctx.lineWidth = 2.0;
+  ctx.fillStyle = 'rgba(6, 12, 28, 0.85)';
+  ctx.strokeStyle = 'rgba(0, 229, 255, 0.45)';
+  ctx.lineWidth = 1.5;
   ctx.beginPath();
   if (ctx.roundRect) {
-    ctx.roundRect(14, 6, w - 28, h - 12, 8);
+    ctx.roundRect(16, 8, w - 32, h - 16, 8);
   } else {
-    ctx.rect(14, 6, w - 28, h - 12);
+    ctx.rect(16, 8, w - 32, h - 16);
   }
   ctx.fill();
   ctx.stroke();
 
   // Corner Accent Brackets
-  ctx.strokeStyle = '#38bdf8';
-  ctx.lineWidth = 3.0;
+  ctx.strokeStyle = '#00e5ff';
+  ctx.lineWidth = 2.5;
   // Top-left
   ctx.beginPath();
-  ctx.moveTo(16, 22);
-  ctx.lineTo(16, 8);
-  ctx.lineTo(30, 8);
+  ctx.moveTo(18, 20);
+  ctx.lineTo(18, 10);
+  ctx.lineTo(28, 10);
   ctx.stroke();
   // Top-right
   ctx.beginPath();
-  ctx.moveTo(w - 16, 22);
-  ctx.lineTo(w - 16, 8);
-  ctx.lineTo(w - 30, 8);
+  ctx.moveTo(w - 18, 20);
+  ctx.lineTo(w - 18, 10);
+  ctx.lineTo(w - 28, 10);
   ctx.stroke();
   // Bottom-left
   ctx.beginPath();
-  ctx.moveTo(16, h - 22);
-  ctx.lineTo(16, h - 8);
-  ctx.lineTo(30, h - 8);
+  ctx.moveTo(18, h - 20);
+  ctx.lineTo(18, h - 10);
+  ctx.lineTo(28, h - 10);
   ctx.stroke();
   // Bottom-right
   ctx.beginPath();
-  ctx.moveTo(w - 16, h - 22);
-  ctx.lineTo(w - 16, h - 8);
-  ctx.lineTo(w - 30, h - 8);
+  ctx.moveTo(w - 18, h - 20);
+  ctx.lineTo(w - 18, h - 10);
+  ctx.lineTo(w - 28, h - 10);
   ctx.stroke();
 
   // Target Title
-  ctx.font = 'bold 30px system-ui, -apple-system, sans-serif';
-  ctx.fillStyle = '#00f0ff';
+  ctx.font = 'bold 28px system-ui, -apple-system, sans-serif';
+  ctx.fillStyle = '#00e5ff';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText(targetTitle.toUpperCase(), w / 2, 40);
+  ctx.fillText(targetTitle.toUpperCase(), w / 2, 42);
 
   // Subtext Coordinates
-  ctx.font = 'bold 20px monospace';
-  ctx.fillStyle = '#38bdf8';
-  ctx.fillText(coordsText, w / 2, 78);
+  ctx.font = '18px monospace';
+  ctx.fillStyle = '#94a3b8';
   ctx.fillText(coordsText, w / 2, 78);
 }
 
@@ -131,6 +130,90 @@ function createTargetBadgeTexture(
   canvas.width = 512;
   canvas.height = 112;
   updateTargetBadgeCanvas(canvas, targetTitle, coordsText);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.needsUpdate = true;
+  return { texture, canvas };
+}
+
+// Holographic Planet Hover Badge Sprite Texture Generator
+function updatePlanetHoverBadgeCanvas(
+  canvas: HTMLCanvasElement,
+  title: string,
+  category: string,
+  velocityStr: string,
+  distStr: string
+): void {
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  const w = canvas.width;
+  const h = canvas.height;
+
+  // Background Glass Pill
+  ctx.fillStyle = 'rgba(6, 12, 28, 0.94)';
+  ctx.strokeStyle = '#00f0ff';
+  ctx.lineWidth = 2.0;
+  ctx.beginPath();
+  if (ctx.roundRect) {
+    ctx.roundRect(10, 6, w - 20, h - 12, 10);
+  } else {
+    ctx.rect(10, 6, w - 20, h - 12);
+  }
+  ctx.fill();
+  ctx.stroke();
+
+  // Corner Accent Highlights
+  ctx.strokeStyle = '#38bdf8';
+  ctx.lineWidth = 3.0;
+  // Top-left
+  ctx.beginPath();
+  ctx.moveTo(12, 22);
+  ctx.lineTo(12, 8);
+  ctx.lineTo(26, 8);
+  ctx.stroke();
+  // Top-right
+  ctx.beginPath();
+  ctx.moveTo(w - 12, 22);
+  ctx.lineTo(w - 12, 8);
+  ctx.lineTo(w - 26, 8);
+  ctx.stroke();
+  // Bottom-left
+  ctx.beginPath();
+  ctx.moveTo(12, h - 22);
+  ctx.lineTo(12, h - 8);
+  ctx.lineTo(26, h - 8);
+  ctx.stroke();
+  // Bottom-right
+  ctx.beginPath();
+  ctx.moveTo(w - 12, h - 22);
+  ctx.lineTo(w - 12, h - 8);
+  ctx.lineTo(w - 26, h - 8);
+  ctx.stroke();
+
+  // Planet Title + Category
+  ctx.font = 'bold 26px system-ui, -apple-system, sans-serif';
+  ctx.fillStyle = '#00f0ff';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(`${title.toUpperCase()}  [${category}]`, w / 2, 36);
+
+  // Subtitle Metrics: Velocity + Sun Distance
+  ctx.font = 'bold 18px monospace';
+  ctx.fillStyle = '#facc15'; // golden accent
+  ctx.fillText(`${velocityStr}  •  ${distStr}`, w / 2, 72);
+}
+
+function createPlanetHoverBadgeTexture(): { texture: THREE.CanvasTexture; canvas: HTMLCanvasElement } {
+  if (typeof document === 'undefined') {
+    return {
+      texture: new THREE.CanvasTexture({} as HTMLCanvasElement),
+      canvas: {} as HTMLCanvasElement,
+    };
+  }
+  const canvas = document.createElement('canvas');
+  canvas.width = 460;
+  canvas.height = 104;
   const texture = new THREE.CanvasTexture(canvas);
   texture.needsUpdate = true;
   return { texture, canvas };
@@ -238,6 +321,7 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
     setCoordinates,
     setHoveredObject,
     planetXMarker,
+    planetXOrbitPath,
   } = useSkyStore();
 
   const storeValuesRef = useRef({
@@ -257,6 +341,7 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
     showScanPath,
     autoRotate,
     planetXMarker,
+    planetXOrbitPath,
   });
 
   useEffect(() => {
@@ -277,6 +362,7 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
       showScanPath,
       autoRotate,
       planetXMarker,
+      planetXOrbitPath,
     };
   }, [
     ra,
@@ -295,6 +381,7 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
     showScanPath,
     autoRotate,
     planetXMarker,
+    planetXOrbitPath,
   ]);
 
   useEffect(() => {
@@ -455,17 +542,17 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
     const wallGeo = new THREE.BufferGeometry();
     const wallVertices = new Float32Array([
       // Front (+Z)
-      hwBase, yStart, hzBase,   hwEnd, yEnd, hzEnd,     -hwEnd, yEnd, hzEnd,
-      hwBase, yStart, hzBase,   -hwEnd, yEnd, hzEnd,    -hwBase, yStart, hzBase,
+      hwBase, yStart, hzBase, hwEnd, yEnd, hzEnd, -hwEnd, yEnd, hzEnd,
+      hwBase, yStart, hzBase, -hwEnd, yEnd, hzEnd, -hwBase, yStart, hzBase,
       // Back (-Z)
-      -hwBase, yStart, -hzBase, -hwEnd, yEnd, -hzEnd,   hwEnd, yEnd, -hzEnd,
-      -hwBase, yStart, -hzBase, hwEnd, yEnd, -hzEnd,    hwBase, yStart, -hzBase,
+      -hwBase, yStart, -hzBase, -hwEnd, yEnd, -hzEnd, hwEnd, yEnd, -hzEnd,
+      -hwBase, yStart, -hzBase, hwEnd, yEnd, -hzEnd, hwBase, yStart, -hzBase,
       // Right (+X)
-      hwBase, yStart, -hzBase,  hwEnd, yEnd, -hzEnd,    hwEnd, yEnd, hzEnd,
-      hwBase, yStart, -hzBase,  hwEnd, yEnd, hzEnd,     hwBase, yStart, hzBase,
+      hwBase, yStart, -hzBase, hwEnd, yEnd, -hzEnd, hwEnd, yEnd, hzEnd,
+      hwBase, yStart, -hzBase, hwEnd, yEnd, hzEnd, hwBase, yStart, hzBase,
       // Left (-X)
-      -hwBase, yStart, hzBase,  -hwEnd, yEnd, hzEnd,    -hwEnd, yEnd, -hzEnd,
-      -hwBase, yStart, hzBase,  -hwEnd, yEnd, -hzEnd,   -hwBase, yStart, -hzBase,
+      -hwBase, yStart, hzBase, -hwEnd, yEnd, hzEnd, -hwEnd, yEnd, -hzEnd,
+      -hwBase, yStart, hzBase, -hwEnd, yEnd, -hzEnd, -hwBase, yStart, -hzBase,
     ]);
     wallGeo.setAttribute('position', new THREE.BufferAttribute(wallVertices, 3));
     wallGeo.computeVertexNormals();
@@ -1189,15 +1276,15 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
       const pGeo = new THREE.SphereGeometry(orbit.size, 32, 24);
       const pMat = tex
         ? new THREE.MeshStandardMaterial({
-            map: tex,
-            roughness: orbit.name === 'Ceres' || orbit.name === 'Pluto' ? 0.85 : 0.65,
-            metalness: 0.05,
-            color: orbit.name === 'Ceres' ? 0xcbc5b9 : orbit.name === 'Pluto' ? 0xc6a487 : 0xffffff,
-          })
+          map: tex,
+          roughness: orbit.name === 'Ceres' || orbit.name === 'Pluto' ? 0.85 : 0.65,
+          metalness: 0.05,
+          color: orbit.name === 'Ceres' ? 0xcbc5b9 : orbit.name === 'Pluto' ? 0xc6a487 : 0xffffff,
+        })
         : new THREE.MeshStandardMaterial({
-            color: new THREE.Color(orbit.color),
-            roughness: 0.5,
-          });
+          color: new THREE.Color(orbit.color),
+          roughness: 0.5,
+        });
       const pMesh = new THREE.Mesh(pGeo, pMat);
       orreryGroup.add(pMesh);
 
@@ -1404,7 +1491,6 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
 
     // --- 8. Solar System Scope Inspired Precision Target Selector HUD ---
     const targetGroup = new THREE.Group();
-    targetGroup.renderOrder = 9999;
     scene.add(targetGroup);
 
     // 8.1 Four Aerodynamic Corner Precision Brackets (┌ ┐ └ ┘)
@@ -1434,7 +1520,6 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
       depthWrite: false,
     });
     const cornerBrackets = new THREE.LineSegments(bracketGeo, bracketMat);
-    cornerBrackets.renderOrder = 9999;
     targetGroup.add(cornerBrackets);
 
     // 8.2 Inner Rotating Segmented Orbiting HUD Reticle
@@ -1463,7 +1548,6 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
       depthWrite: false,
     });
     const segmentedRing = new THREE.LineSegments(segRingGeo, segRingMat);
-    segmentedRing.renderOrder = 9999;
     targetGroup.add(segmentedRing);
 
     // 8.3 Outer Precision Circular Ring
@@ -1478,7 +1562,6 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
       depthWrite: false,
     });
     const outerRing = new THREE.Mesh(outerRingGeo, outerRingMat);
-    outerRing.renderOrder = 9999;
     targetGroup.add(outerRing);
 
     // 8.4 Four Cardinal Crosshair Ticks
@@ -1497,7 +1580,6 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
       depthWrite: false,
     });
     const crosshairTicks = new THREE.LineSegments(tickGeo, tickMat);
-    crosshairTicks.renderOrder = 9999;
     targetGroup.add(crosshairTicks);
 
     // 8.5 Center Glowing Reticle Core Dot
@@ -1512,7 +1594,6 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
       depthWrite: false,
     });
     const centerCore = new THREE.Mesh(centerCoreGeo, centerCoreMat);
-    centerCore.renderOrder = 9999;
     targetGroup.add(centerCore);
 
     // 8.6 Dynamic Radar Acquisition Pulse Ring
@@ -1527,7 +1608,6 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
       depthWrite: false,
     });
     const radarPing = new THREE.Mesh(radarPingGeo, radarPingMat);
-    radarPing.renderOrder = 9999;
     targetGroup.add(radarPing);
 
     // 8.7 Floating Target Holographic Info Badge (Billboard HUD)
@@ -1543,8 +1623,6 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
       depthWrite: false,
     });
     const targetBadgeSprite = new THREE.Sprite(badgeMat);
-    targetBadgeSprite.center.set(0.5, 0.0);
-    targetBadgeSprite.renderOrder = 9999;
     targetBadgeSprite.scale.set(11.5, 2.5, 1);
     targetBadgeSprite.position.set(0, 8.2, 0);
     targetGroup.add(targetBadgeSprite);
@@ -1556,6 +1634,91 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
     const pxMat = new THREE.MeshBasicMaterial({ color: 0xff3df2, side: THREE.DoubleSide, transparent: true, opacity: 0.9 });
     planetXGroup.add(new THREE.Mesh(new THREE.RingGeometry(1.6, 2.1, 32), pxMat));
     planetXGroup.add(new THREE.Mesh(new THREE.CircleGeometry(0.5, 16), pxMat));
+
+    // Hypothetical Planet X 3D Orbit line in Orrery
+    const pxOrbitGeo = new THREE.BufferGeometry();
+    const pxOrbitMat = new THREE.LineBasicMaterial({
+      color: 0xff3df2,
+      transparent: true,
+      opacity: 0.85,
+    });
+    const planetXOrbitLine = new THREE.Line(pxOrbitGeo, pxOrbitMat);
+    planetXOrbitLine.visible = false;
+    orreryGroup.add(planetXOrbitLine);
+
+    // 8.8 3D Planet Hover Reticle & Holographic Badge (Billboarding HUD)
+    interface HoveredTargetInfo {
+      name: string;
+      category: string;
+      ra: number;
+      dec: number;
+      worldPos: THREE.Vector3;
+      baseRadius: number;
+      velocityKms: number;
+      distAu: number;
+      periodDays: number;
+    }
+    let currentHoveredPlanet: HoveredTargetInfo | null = null;
+
+    const planetHoverGroup = new THREE.Group();
+    planetHoverGroup.visible = false;
+    planetHoverGroup.renderOrder = 9998;
+    scene.add(planetHoverGroup);
+
+    // Dynamic Hover Reticle Ring (cyan)
+    const hoverRingMat = new THREE.MeshBasicMaterial({
+      color: 0x00f0ff,
+      side: THREE.DoubleSide,
+      transparent: true,
+      opacity: 0.85,
+      depthTest: false,
+    });
+    const hoverRing = new THREE.Mesh(new THREE.RingGeometry(1.6, 1.85, 32), hoverRingMat);
+    hoverRing.renderOrder = 9998;
+    planetHoverGroup.add(hoverRing);
+
+    // 4 Corner Brackets for Hover Target
+    const hoverBracketMat = new THREE.LineBasicMaterial({
+      color: 0x38bdf8,
+      transparent: true,
+      opacity: 0.95,
+      depthTest: false,
+    });
+    const hbSize = 2.4;
+    const hbArm = 0.7;
+    const hbPoints: THREE.Vector3[] = [
+      new THREE.Vector3(-hbSize, hbSize - hbArm, 0),
+      new THREE.Vector3(-hbSize, hbSize, 0),
+      new THREE.Vector3(-hbSize + hbArm, hbSize, 0),
+      new THREE.Vector3(hbSize - hbArm, hbSize, 0),
+      new THREE.Vector3(hbSize, hbSize, 0),
+      new THREE.Vector3(hbSize, hbSize - hbArm, 0),
+      new THREE.Vector3(hbSize, -hbSize + hbArm, 0),
+      new THREE.Vector3(hbSize, -hbSize, 0),
+      new THREE.Vector3(hbSize - hbArm, -hbSize, 0),
+      new THREE.Vector3(-hbSize + hbArm, -hbSize, 0),
+      new THREE.Vector3(-hbSize, -hbSize, 0),
+      new THREE.Vector3(-hbSize, -hbSize + hbArm, 0),
+    ];
+    const hbGeo = new THREE.BufferGeometry().setFromPoints(hbPoints);
+    const hoverBrackets = new THREE.LineSegments(hbGeo, hoverBracketMat);
+    hoverBrackets.renderOrder = 9998;
+    planetHoverGroup.add(hoverBrackets);
+
+    // Floating Holographic Hover Badge Sprite
+    const { texture: hoverBadgeTex, canvas: hoverBadgeCanvas } = createPlanetHoverBadgeTexture();
+    const hoverBadgeMat = new THREE.SpriteMaterial({
+      map: hoverBadgeTex,
+      transparent: true,
+      opacity: 0.95,
+      depthTest: false,
+    });
+    const hoverBadgeSprite = new THREE.Sprite(hoverBadgeMat);
+    hoverBadgeSprite.center.set(0.5, 0.0);
+    hoverBadgeSprite.renderOrder = 9998;
+    hoverBadgeSprite.scale.set(7.5, 1.7, 1);
+    hoverBadgeSprite.position.set(0, 3.2, 0);
+    planetHoverGroup.add(hoverBadgeSprite);
 
     // Sample Known Transient Candidates on Sphere
     const sampleCandidates = [
@@ -1595,6 +1758,158 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
 
       raycaster.setFromCamera(mouse, camera);
 
+      // 1. Planet & Minor Body Screen-Space Proximity Picking (Smooth Hover Effect)
+      if (storeValuesRef.current.showOrrery && storeValuesRef.current.viewMode !== 'spacecraft') {
+        const px = e.clientX - rect.left;
+        const py = e.clientY - rect.top;
+        const jd = getJulianDate();
+        const when = new Date().toISOString().replace('T', ' ').slice(0, 19) + ' UTC';
+
+        interface BestHitType {
+          d: number;
+          name: string;
+          category: string;
+          meshPos: THREE.Vector3;
+          radius: number;
+          rAu: number;
+          vKms: number;
+          periodDays: number;
+          description: string;
+        }
+        let bestHit: BestHitType | null = null;
+
+        // Check Planets (Mercury through Neptune, Ceres, Pluto)
+        for (const { mesh, orbit } of planetMeshes) {
+          const worldPos = mesh.position.clone();
+          const ndc = worldPos.clone().project(camera);
+          if (ndc.z > 1) continue; // behind camera
+          const sx = ((ndc.x + 1) / 2) * rect.width;
+          const sy = ((1 - ndc.y) / 2) * rect.height;
+          const d = Math.hypot(sx - px, sy - py);
+          const hitRadius = Math.max(24, (orbit.size / Math.max(1, worldPos.distanceTo(camera.position))) * 1400);
+          if (d < hitRadius && (!bestHit || d < (bestHit as BestHitType).d)) {
+            // Solve Kepler equation for exact true heliocentric distance in AU
+            const mDeg = ((jd - 2451545.0) * (360.0 / orbit.periodDays)) % 360;
+            const M = mDeg * (Math.PI / 180);
+            let E = M;
+            for (let it = 0; it < 10; it++) {
+              E -= (E - orbit.e * Math.sin(E) - M) / (1 - orbit.e * Math.cos(E));
+            }
+            const rAu = orbit.realAU * (1 - orbit.e * Math.cos(E));
+            const vKms = 29.7847 * Math.sqrt(Math.max(0, 2 / rAu - 1 / orbit.realAU));
+            bestHit = {
+              d,
+              name: orbit.name,
+              category: orbit.category,
+              meshPos: worldPos,
+              radius: orbit.size,
+              rAu,
+              vKms,
+              periodDays: orbit.periodDays,
+              description: orbit.description,
+            };
+          }
+        }
+
+        // Check Moon
+        {
+          const worldPos = moonMesh.position.clone();
+          const ndc = worldPos.clone().project(camera);
+          if (ndc.z <= 1) {
+            const sx = ((ndc.x + 1) / 2) * rect.width;
+            const sy = ((1 - ndc.y) / 2) * rect.height;
+            const d = Math.hypot(sx - px, sy - py);
+            if (d < 24 && (!bestHit || d < (bestHit as BestHitType).d)) {
+              bestHit = {
+                d,
+                name: 'Moon',
+                category: 'Natural Satellite',
+                meshPos: worldPos,
+                radius: 0.32,
+                rAu: 1.0,
+                vKms: 1.02,
+                periodDays: 27.32,
+                description: 'Distance to Earth: 384,400 km | Tidally locked to Earth',
+              };
+            }
+          }
+        }
+
+        // Check Comets
+        for (const { nucleus, orbit } of cometMeshes) {
+          const worldPos = nucleus.position.clone();
+          const ndc = worldPos.clone().project(camera);
+          if (ndc.z > 1) continue;
+          const sx = ((ndc.x + 1) / 2) * rect.width;
+          const sy = ((1 - ndc.y) / 2) * rect.height;
+          const d = Math.hypot(sx - px, sy - py);
+          if (d < 24 && (!bestHit || d < (bestHit as BestHitType).d)) {
+            const mDeg = ((jd - 2451545.0) * (360.0 / orbit.periodDays)) % 360;
+            const M = mDeg * (Math.PI / 180);
+            let E = M;
+            for (let it = 0; it < 10; it++) {
+              E -= (E - orbit.e * Math.sin(E) - M) / (1 - orbit.e * Math.cos(E));
+            }
+            const rAu = orbit.realAU * (1 - orbit.e * Math.cos(E));
+            const vKms = 29.7847 * Math.sqrt(Math.max(0, 2 / rAu - 1 / orbit.realAU));
+            bestHit = {
+              d,
+              name: orbit.name,
+              category: 'Comet',
+              meshPos: worldPos,
+              radius: orbit.size,
+              rAu,
+              vKms,
+              periodDays: orbit.periodDays,
+              description: orbit.description,
+            };
+          }
+        }
+
+        if (bestHit) {
+          const icrs = vectorToIcrs(bestHit.meshPos.clone().normalize().multiplyScalar(sphereRadius));
+          currentHoveredPlanet = {
+            name: bestHit.name,
+            category: bestHit.category,
+            ra: icrs.ra,
+            dec: icrs.dec,
+            worldPos: bestHit.meshPos,
+            baseRadius: bestHit.radius,
+            velocityKms: bestHit.vKms,
+            distAu: bestHit.rAu,
+            periodDays: bestHit.periodDays,
+          };
+
+          updatePlanetHoverBadgeCanvas(
+            hoverBadgeCanvas,
+            bestHit.name,
+            bestHit.category,
+            `v: ${bestHit.vKms.toFixed(2)} km/s`,
+            `r: ${bestHit.rAu.toFixed(3)} AU`
+          );
+          hoverBadgeTex.needsUpdate = true;
+          planetHoverGroup.visible = true;
+
+          const periodStr = bestHit.periodDays > 365.25
+            ? `${(bestHit.periodDays / 365.25).toFixed(2)} yr`
+            : `${bestHit.periodDays.toFixed(1)} days`;
+
+          setHoveredObject({
+            name: `${bestHit.name} (${bestHit.category})`,
+            ra: icrs.ra,
+            dec: icrs.dec,
+            type: 'Planet',
+            extra: `${when} | Speed: ${bestHit.vKms.toFixed(2)} km/s | Sun dist: ${bestHit.rAu.toFixed(3)} AU | Period: ${periodStr} | ${bestHit.description}`,
+          });
+          renderer.domElement.style.cursor = 'pointer';
+          return;
+        }
+      }
+
+      // No planet hovered: hide planet hover HUD
+      currentHoveredPlanet = null;
+      planetHoverGroup.visible = false;
+
       // Check Candidates
       const candHits = raycaster.intersectObjects(candidateMeshes.map((c) => c.mesh));
       if (candHits.length > 0) {
@@ -1606,59 +1921,6 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
             dec: hit.data.dec,
             type: 'Candidate',
             extra: `ID: ${hit.data.id} | Class: ${hit.data.type}`,
-          });
-          renderer.domElement.style.cursor = 'pointer';
-          return;
-        }
-      }
-
-      // Check Planets & Dwarf Planets
-      const planetHitObjects = planetMeshes.map((p) => p.mesh);
-      const planetHits = raycaster.intersectObjects(planetHitObjects);
-      if (planetHits.length > 0) {
-        const hitP = planetMeshes.find((p) => p.mesh === planetHits[0].object);
-        if (hitP) {
-          const icrs = vectorToIcrs(planetHits[0].point);
-          setHoveredObject({
-            name: `${hitP.orbit.name} (${hitP.orbit.category})`,
-            ra: icrs.ra,
-            dec: icrs.dec,
-            type: 'Planet',
-            extra: `Semi-major axis: ${hitP.orbit.realAU.toFixed(3)} AU | Period: ${hitP.orbit.periodDays.toFixed(1)} days | Eccentricity: ${hitP.orbit.e.toFixed(3)} | ${hitP.orbit.description}`,
-          });
-          renderer.domElement.style.cursor = 'pointer';
-          return;
-        }
-      }
-
-      // Check Moon
-      const moonHits = raycaster.intersectObject(moonMesh);
-      if (moonHits.length > 0) {
-        const icrs = vectorToIcrs(moonHits[0].point);
-        setHoveredObject({
-          name: "Moon (Earth's Natural Satellite)",
-          ra: icrs.ra,
-          dec: icrs.dec,
-          type: 'Planet',
-          extra: 'Distance to Earth: 384,400 km (0.00257 AU) | Period: 27.32 days | Tidally locked | Synchronous rotation',
-        });
-        renderer.domElement.style.cursor = 'pointer';
-        return;
-      }
-
-      // Check Comets
-      const cometHitObjects = cometMeshes.map((c) => c.nucleus);
-      const cometHits = raycaster.intersectObjects(cometHitObjects);
-      if (cometHits.length > 0) {
-        const hitC = cometMeshes.find((c) => c.nucleus === cometHits[0].object);
-        if (hitC) {
-          const icrs = vectorToIcrs(cometHits[0].point);
-          setHoveredObject({
-            name: `${hitC.orbit.name} (Comet)`,
-            ra: icrs.ra,
-            dec: icrs.dec,
-            type: 'Candidate',
-            extra: `Semi-major axis: ${hitC.orbit.realAU.toFixed(1)} AU | Period: ${(hitC.orbit.periodDays / 365.25).toFixed(1)} yrs | Eccentricity: ${hitC.orbit.e.toFixed(2)} | Dual 3D Anti-Solar Tails | ${hitC.orbit.description}`,
           });
           renderer.domElement.style.cursor = 'pointer';
           return;
@@ -1708,6 +1970,13 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
       mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
       mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
 
+      // 1. Check Planet Click (slew to hovered planet)
+      if (currentHoveredPlanet) {
+        setCoordinates(currentHoveredPlanet.ra, currentHoveredPlanet.dec, currentHoveredPlanet.name);
+        if (onCoordinateClick) onCoordinateClick(currentHoveredPlanet.ra, currentHoveredPlanet.dec);
+        return;
+      }
+
       raycaster.setFromCamera(mouse, camera);
 
       // Check candidate click
@@ -1754,8 +2023,6 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
     let lastTargetRa = -999;
     let lastTargetDec = -999;
     let lastTargetName: string | null = null;
-    let cameraSlewFrames = 0;
-    const desiredCameraPos = new THREE.Vector3(0, 30, 160);
 
     const animate = () => {
       reqId = requestAnimationFrame(animate);
@@ -1894,6 +2161,28 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
         planetXGroup.lookAt(new THREE.Vector3(0, 0, 0));
       }
 
+      // 8.8 Animate 3D Planet Hover Reticle & Holographic Badge
+      if (currentHoveredPlanet && planetHoverGroup.visible && !isSpacecraftMode) {
+        planetHoverGroup.position.copy(currentHoveredPlanet.worldPos);
+        planetHoverGroup.quaternion.copy(camera.quaternion);
+        const distToCam = camera.position.distanceTo(currentHoveredPlanet.worldPos);
+        const hoverScale = Math.max(0.6, distToCam / 70.0);
+        const breath = 1.0 + 0.05 * Math.sin(elapsed * 6.0);
+        planetHoverGroup.scale.setScalar(hoverScale * breath);
+      } else {
+        planetHoverGroup.visible = false;
+      }
+
+      // Planet X 3D Orbit Line update
+      const pxPath = storeValuesRef.current.planetXOrbitPath;
+      if (pxPath && pxPath.length > 0 && storeValuesRef.current.showOrrery && !isSpacecraftMode) {
+        planetXOrbitLine.visible = true;
+        const pts = pxPath.map(([x, y, z]) => new THREE.Vector3(x * 0.14, z * 0.14, y * 0.14));
+        planetXOrbitLine.geometry.setFromPoints(pts);
+      } else {
+        planetXOrbitLine.visible = false;
+      }
+
       // --- Spacecraft Slew: Smoothly rotate SPHEREx along +Y aperture to point at target RA/Dec ---
       const targetDir = icrsToUnitVector(
         storeValuesRef.current.ra,
@@ -1955,41 +2244,27 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
         if (transitionFrames > 0) {
           camera.position.lerp(new THREE.Vector3(0, 30, 160), 0.06);
           transitionFrames--;
-        } else if (cameraSlewFrames > 0) {
-          camera.position.lerp(desiredCameraPos, 0.06);
-          cameraSlewFrames--;
         }
         controls.target.lerp(new THREE.Vector3(0, 0, 0), 0.1);
       }
 
-      // Animate Solar System Scope Precision Target Selector with Constant Screen-Space Scaling
-      const distToCamera = camera.position.distanceTo(targetPos);
-      const hudScale = Math.max(0.4, distToCamera / 140.0);
-
+      // Animate Solar System Scope Precision Target Selector
       segmentedRing.rotation.z = -elapsed * 0.45;
-      segmentedRing.scale.set(hudScale, hudScale, 1);
-      centerCore.scale.set(hudScale, hudScale, 1);
-
-      const breath = (1.0 + Math.sin(elapsed * 2.4) * 0.04) * hudScale;
+      const breath = 1.0 + Math.sin(elapsed * 2.4) * 0.04;
       cornerBrackets.scale.set(breath, breath, 1);
       outerRing.scale.set(breath, breath, 1);
       crosshairTicks.scale.set(breath, breath, 1);
 
       // Expanding Radar Pulse Ring
       const pingT = (elapsed * 0.75) % 1.0;
-      radarPing.scale.set((1.0 + pingT * 3.5) * hudScale, (1.0 + pingT * 3.5) * hudScale, 1);
+      radarPing.scale.set(1.0 + pingT * 3.5, 1.0 + pingT * 3.5, 1);
       radarPingMat.opacity = Math.max(0, (1.0 - pingT) * 0.7);
-
-      // Floating Badge Scale & Position
-      targetBadgeSprite.scale.set(11.5 * hudScale, 2.5 * hudScale, 1);
-      targetBadgeSprite.position.set(0, 8.2 * hudScale, 0);
 
       // Dynamically update floating target HUD badge when coordinates or preset change
       const curRa = storeValuesRef.current.ra;
       const curDec = storeValuesRef.current.dec;
       const curName = storeValuesRef.current.activePresetName;
       if (curRa !== lastTargetRa || curDec !== lastTargetDec || curName !== lastTargetName) {
-        const isInitial = lastTargetRa === -999;
         lastTargetRa = curRa;
         lastTargetDec = curDec;
         lastTargetName = curName;
@@ -1999,17 +2274,6 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
           `RA: ${curRa.toFixed(2)}° | DEC: ${curDec.toFixed(2)}°`
         );
         badgeTexture.needsUpdate = true;
-
-        if (!isInitial && storeValuesRef.current.viewMode === 'sky') {
-          const tDir = icrsToUnitVector(curRa, curDec, 1.0);
-          const camDist = 160;
-          desiredCameraPos.set(
-            -tDir.x * camDist * 0.95,
-            -tDir.y * camDist * 0.95 + 26,
-            -tDir.z * camDist * 0.95
-          ).normalize().multiplyScalar(camDist);
-          cameraSlewFrames = 40;
-        }
       }
 
       // Pulse sample candidates

@@ -29,6 +29,7 @@ export default function PlanetXPanel({ onClose }: { onClose: () => void }) {
   const [applied, setApplied] = useState<PlanetXParams | null>(null);
   const [idx, setIdx] = useState(0);
   const setMarker = useSkyStore((s) => s.setPlanetXMarker);
+  const setOrbitPath = useSkyStore((s) => s.setPlanetXOrbitPath);
 
   const run = () => setApplied({ start, end, step, ...vals });
   useEffect(run, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -41,7 +42,13 @@ export default function PlanetXPanel({ onClose }: { onClose: () => void }) {
   useEffect(() => {
     setMarker(pt ? { ra: pt.ra_deg, dec: pt.dec_deg, name: 'Planet X (hypothetical)' } : null);
   }, [pt, setMarker]);
-  useEffect(() => () => setMarker(null), [setMarker]);
+  useEffect(() => {
+    setOrbitPath(data?.orbit_path ?? null);
+  }, [data, setOrbitPath]);
+  useEffect(() => () => {
+    setMarker(null);
+    setOrbitPath(null);
+  }, [setMarker, setOrbitPath]);
 
   // Top-down orbit diagram (ecliptic x,y), Sun at centre
   const diagram = useMemo(() => {

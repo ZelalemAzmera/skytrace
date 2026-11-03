@@ -736,3 +736,37 @@ Diagnosed the weird selector root cause in `CelestialSphere.tsx`: the 3D photome
 5. Deployment:
    - Staged, committed, and pushed changes to GitHub `origin/main` for live Vercel deployment.
 ---
+
+---
+### Turn 38 - [2026-11-03 19:15:00]
+#### 👤 User Prompt:
+There is a branch called calculator that is the correct calculation of the whole thing and in the front end there is a hovering effect over the planet so merge those features
+[Attachments: 5 screenshots from explore page + IDE screenshot with "??? have you finished"]
+
+#### 🤖 Agent Response:
+Merged all scientific calculations and interactive frontend features from the `calculator` branch into `main` while preserving 100% of the SPHEREx spacecraft, LEO Earth globe, 3D volumetric light frustum, teardown exploded view, Solar System Scope realistic planet textures, and calibrated orrery:
+1. Scientific Calculation Engine Integration:
+   - Real Keplerian heliocentric distance calculation in AU ($r_{\text{AU}} = a_{\text{real}} (1 - e \cos E)$) for all planets and minor bodies.
+   - Live Vis-Viva orbital speed calculation: $v = 29.7847 \times \sqrt{\max(0, 2/r_{\text{AU}} - 1/a_{\text{real}})} \text{ km/s}$.
+   - Live UTC timestamp on hover (`YYYY-MM-DD HH:MM:SS UTC`).
+   - Clean multi-line formatting in `SkyHUD.tsx` using `split(' | ')`.
+   - Client-side fallback `computeClientPlanetX(p)` in `usePlanetX.ts` ensuring instantaneous Planet X orbital propagation, Hill sphere radii, perihelion/aphelion speeds, and track calculation even when offline or deployed on Vercel.
+2. 3D Planet Hover Effect & Screen-Space Proximity Picking:
+   - Replaced broken raycasting against 1px planet spheres with screen-space proximity picking ($d < 24\text{px}$).
+   - Added 3D `planetHoverGroup` in Three.js featuring an animated cyan targeting ring (`0x00f0ff`) with breathing oscillation, 4 precision corner brackets, and a high-DPI floating holographic tooltip badge billboard (`updatePlanetHoverBadgeCanvas`).
+   - Floating badge displays the planet's name, category, live orbital speed (e.g. `v: 23.65 km/s`), and heliocentric distance (e.g. `r: 1.555 AU`) directly above the planet in 3D.
+   - Screen-space distance scaling so the reticle neatly hugs any planet regardless of zoom distance.
+   - Depth test set to `false` and `renderOrder = 9998` ensuring the hover reticle is never occluded.
+   - Click-to-slew on planet in `handlePointerDown`: clicking any hovered planet centers coordinates and slews camera to it.
+3. 3D Planet X Orbit Visualization:
+   - Added `planetXOrbitPath` state in Zustand store `skyStore.ts`.
+   - Wired `PlanetXPanel.tsx` to publish the calculated 3D orbit trajectory into the store.
+   - Rendered an illuminated magenta 3D orbit line (`planetXOrbitLine`, `0xff3df2`) in the Three.js orrery scene.
+4. Production Build & Playwright Visual Verification:
+   - Compiled optimized Next.js 14 production build (`npm run build`) with 0 errors across all 6 static routes.
+   - Executed Playwright automated test `test_phase11_planet_hover.mjs`:
+     - Captured `solarsystemscope_planet_hover_detected.png`: verified hover reticle, floating holographic badge over Mars, and multi-line telemetry card in HUD.
+     - Captured `solarsystemscope_planet_x_panel.png`: verified Planet X parameter controls, 2D ecliptic diagram, and wide magenta 3D elliptical orbit line in scene.
+5. Deployment:
+   - Committed and pushed changes to GitHub `origin/main` for live Vercel deployment.
+---

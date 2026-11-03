@@ -43,9 +43,11 @@ export interface SkyState {
   showObservationVolume: boolean;
   showTeardown: boolean;
 
-  // Hypothetical Planet X direction on the sky at the selected timeline time
+  // Hypothetical Planet X direction and 3D orbit on the sky / orrery
   planetXMarker: { ra: number; dec: number; name: string } | null;
   setPlanetXMarker: (m: { ra: number; dec: number; name: string } | null) => void;
+  planetXOrbitPath: [number, number, number][] | null;
+  setPlanetXOrbitPath: (p: [number, number, number][] | null) => void;
 
   // Actions
   setViewMode: (mode: 'sky' | 'spacecraft') => void;
@@ -106,6 +108,8 @@ export const useSkyStore = create<SkyState>((set) => ({
 
   planetXMarker: null,
   setPlanetXMarker: (planetXMarker) => set({ planetXMarker }),
+  planetXOrbitPath: null,
+  setPlanetXOrbitPath: (planetXOrbitPath) => set({ planetXOrbitPath }),
 
   setViewMode: (viewMode) => set({ viewMode }),
 
