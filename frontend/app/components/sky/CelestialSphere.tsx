@@ -18,6 +18,7 @@ import {
   keplerToCartesian,
   getJulianDate,
 } from '../../lib/astrometry';
+import { eclipticToOrrery } from '../../lib/planetXScale';
 
 interface CelestialSphereProps {
   onCoordinateClick?: (ra: number, dec: number) => void;
@@ -322,6 +323,7 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
     setHoveredObject,
     planetXMarker,
     planetXOrbitPath,
+    planetXScene,
   } = useSkyStore();
 
   const storeValuesRef = useRef({
@@ -342,6 +344,7 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
     autoRotate,
     planetXMarker,
     planetXOrbitPath,
+    planetXScene,
   });
 
   useEffect(() => {
@@ -363,6 +366,7 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
       autoRotate,
       planetXMarker,
       planetXOrbitPath,
+      planetXScene,
     };
   }, [
     ra,
@@ -382,6 +386,7 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
     autoRotate,
     planetXMarker,
     planetXOrbitPath,
+    planetXScene,
   ]);
 
   useEffect(() => {
@@ -1195,6 +1200,7 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
 
     // --- 7. Solar System Orrery with Solar System Scope Authentic Textures & Orbital Model ---
     const orreryGroup = new THREE.Group();
+    orreryGroup.rotation.x = -(23.43929 * Math.PI) / 180; // ecliptic plane tilted by the obliquity, like the ecliptic ring and the RA/Dec sphere
     scene.add(orreryGroup);
 
     // Central Sun with Solar System Scope Photosphere
@@ -1646,6 +1652,28 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
     planetXOrbitLine.visible = false;
     orreryGroup.add(planetXOrbitLine);
 
+    // Planet X body on its orbit at the selected date (same scale/plane as the planets)
+    const planetXBody = new THREE.Mesh(
+      new THREE.SphereGeometry(2.4, 20, 20),
+      new THREE.MeshBasicMaterial({ color: 0xff3df2 })
+    );
+    planetXBody.visible = false;
+    orreryGroup.add(planetXBody);
+    const pxLabelCv = document.createElement('canvas');
+    pxLabelCv.width = 256; pxLabelCv.height = 64;
+    const pxLabelCx = pxLabelCv.getContext('2d')!;
+    pxLabelCx.font = 'bold 30px monospace';
+    pxLabelCx.fillStyle = '#ff3df2';
+    pxLabelCx.textBaseline = 'middle';
+    pxLabelCx.fillText('Planet X', 6, 32);
+    const planetXLabel = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(pxLabelCv), transparent: true, depthTest: false }));
+    planetXLabel.scale.set(24, 6, 1);
+    planetXLabel.center.set(0, 0.5);
+    planetXLabel.visible = false;
+    orreryGroup.add(planetXLabel);
+    let pxHadPath = false;
+    let pxFrameFrames = 0;
+
     // 8.8 3D Planet Hover Reticle & Holographic Badge (Billboarding HUD)
     interface HoveredTargetInfo {
       name: string;
@@ -1780,7 +1808,7 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
 
         // Check Planets (Mercury through Neptune, Ceres, Pluto)
         for (const { mesh, orbit } of planetMeshes) {
-          const worldPos = mesh.position.clone();
+          const worldPos = mesh.getWorldPosition(new THREE.Vector3());
           const ndc = worldPos.clone().project(camera);
           if (ndc.z > 1) continue; // behind camera
           const sx = ((ndc.x + 1) / 2) * rect.width;
@@ -2177,10 +2205,27 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
       const pxPath = storeValuesRef.current.planetXOrbitPath;
       if (pxPath && pxPath.length > 0 && storeValuesRef.current.showOrrery && !isSpacecraftMode) {
         planetXOrbitLine.visible = true;
-        const pts = pxPath.map(([x, y, z]) => new THREE.Vector3(x * 0.14, z * 0.14, y * 0.14));
+        // Same compressed scale as the planets (outside Neptune), same ecliptic plane (group is tilted)
+        const pts = pxPath.map(([x, y, z]) => eclipticToOrrery(x, y, z));
         planetXOrbitLine.geometry.setFromPoints(pts);
+        const pxs = storeValuesRef.current.planetXScene;
+        planetXBody.visible = !!pxs;
+        planetXLabel.visible = !!pxs;
+        if (pxs) {
+          const bp = eclipticToOrrery(pxs.pos[0], pxs.pos[1], pxs.pos[2]);
+          planetXBody.position.copy(bp);
+          planetXLabel.position.copy(bp).add(new THREE.Vector3(3.2, 2.2, 0));
+        }
+        if (!pxHadPath) { pxHadPath = true; pxFrameFrames = 100; } // zoom out once so the whole orbit is in view
       } else {
         planetXOrbitLine.visible = false;
+        planetXBody.visible = false;
+        planetXLabel.visible = false;
+        pxHadPath = false;
+      }
+      if (pxFrameFrames > 0 && !isSpacecraftMode) {
+        camera.position.lerp(new THREE.Vector3(0, 90, 270), 0.06);
+        pxFrameFrames--;
       }
 
       // --- Spacecraft Slew: Smoothly rotate SPHEREx along +Y aperture to point at target RA/Dec ---

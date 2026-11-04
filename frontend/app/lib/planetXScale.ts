@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { PLANET_ORBITS } from './astrometry';
 
 /**
  * Shared logarithmic radial scale used to show Planet X (hundreds of AU) together with the planets
@@ -47,4 +48,40 @@ export interface PlanetXSceneData {
   path: [number, number, number][];
   pos: [number, number, number];
   planets: { name: string; a: number; pos: [number, number, number] }[];
+}
+
+/**
+ * Orrery visual radius for a real heliocentric distance, so Planet X is drawn on the SAME compressed
+ * scale as the planets in the 3D orrery (which uses a hand-calibrated `a` per planet, not real AU).
+ * Piecewise-linear in log10(AU) through the planets' (realAU -> visual a) table; beyond Neptune it
+ * continues at ORRERY_OUTER_SLOPE visual units per decade, so Planet X always lies outside Neptune.
+ */
+const ORRERY_OUTER_SLOPE = 30;
+const ORRERY_TABLE = PLANET_ORBITS
+  .filter((o) => o.category === 'Planet')
+  .map((o) => ({ lr: Math.log10(o.realAU), v: o.a }))
+  .sort((p, q) => p.lr - q.lr);
+
+export function orreryRadiusFromAU(rAU: number): number {
+  if (rAU <= 0) return 0;
+  const lr = Math.log10(rAU);
+  const t = ORRERY_TABLE;
+  const last = t[t.length - 1];
+  if (lr >= last.lr) return last.v + ORRERY_OUTER_SLOPE * (lr - last.lr);
+  if (lr <= t[0].lr) return t[0].v * (rAU / Math.pow(10, t[0].lr));
+  for (let i = 1; i < t.length; i++) {
+    if (lr <= t[i].lr) {
+      const f = (lr - t[i - 1].lr) / (t[i].lr - t[i - 1].lr);
+      return t[i - 1].v + f * (t[i].v - t[i - 1].v);
+    }
+  }
+  return last.v;
+}
+
+/** Heliocentric ecliptic AU -> position inside orreryGroup (same axis mapping as keplerToCartesian: x, z, y). */
+export function eclipticToOrrery(x: number, y: number, z: number): THREE.Vector3 {
+  const r = Math.hypot(x, y, z);
+  if (r === 0) return new THREE.Vector3();
+  const f = orreryRadiusFromAU(r) / r;
+  return new THREE.Vector3(x * f, z * f, y * f);
 }
