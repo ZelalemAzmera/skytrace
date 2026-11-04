@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Solar System & Space Object Explorer (research-oriented starter).
 
 Queries JPL Horizons for supported Solar System objects, optionally propagates a
@@ -322,14 +321,31 @@ PLANET_X_PRESETS = {
     'default-assumed':    dict(a=500.0, e=0.30, inc=20.0, node=0.0,  arg_peri=0.0,   M0_deg=0.0,   mass_earth=6.0),
 }
 
-def earth_helio_ecl_builtin(jd_utc):
-    """Heliocentric ecliptic (J2000) Earth position in AU from astropy's built-in ephemeris (offline).
-    Used when JPL Horizons is unavailable; agrees with Horizons to ~1e-5 AU or better for this purpose."""
+def helio_ecl_builtin(body, jd_utc):
+    """Heliocentric ecliptic (J2000) position of a Solar System body in AU from astropy's built-in
+    ephemeris (offline). Accuracy is roughly arc-minutes for the planets, fine for display/geometry;
+    use JPL Horizons when exact values are needed."""
     from astropy.coordinates import get_body_barycentric, SkyCoord, HeliocentricMeanEcliptic, ICRS
     t = Time(jd_utc, format='jd', scale='utc')
-    r = get_body_barycentric('earth', t, ephemeris='builtin') - get_body_barycentric('sun', t, ephemeris='builtin')
+    r = get_body_barycentric(body, t, ephemeris='builtin') - get_body_barycentric('sun', t, ephemeris='builtin')
     c = SkyCoord(ICRS(r)).transform_to(HeliocentricMeanEcliptic(equinox=Time('J2000')))
     return np.array(c.cartesian.xyz.to_value('AU'), float)
+
+def earth_helio_ecl_builtin(jd_utc):
+    """Earth, heliocentric ecliptic J2000, AU (offline)."""
+    return helio_ecl_builtin('earth', jd_utc)
+
+PLANET_SEMI_MAJOR_AU = {'Mercury': 0.387098, 'Venus': 0.723332, 'Earth': 1.000000, 'Mars': 1.523679,
+                        'Jupiter': 5.2026, 'Saturn': 9.5549, 'Uranus': 19.2184, 'Neptune': 30.1104}
+
+def planet_positions_builtin(jd_utc):
+    """Real heliocentric ecliptic positions (AU) of Mercury..Neptune at one instant, for comparison views."""
+    out = []
+    for name, a in PLANET_SEMI_MAJOR_AU.items():
+        v = helio_ecl_builtin(name.lower(), jd_utc)
+        out.append({'name': name, 'a_au': a, 'x_au': float(v[0]), 'y_au': float(v[1]), 'z_au': float(v[2]),
+                    'distance_au': float(np.linalg.norm(v))})
+    return out
 
 def planet_x_orbit_summary(a, e, inc, mass_earth):
     """Size/shape/mass facts that follow from the elements. Mass is an INPUT (an orbit alone cannot give it)."""

@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -232,5 +232,30 @@ export function usePlanetX(p: PlanetXParams | null) {
     },
     enabled: !!p,
     staleTime: 10 * 60 * 1000,
+    placeholderData: keepPreviousData,
+  });
+}
+
+export interface PlanetPosition {
+  name: string;
+  a_au: number;
+  x_au: number;
+  y_au: number;
+  z_au: number;
+  distance_au: number;
+}
+
+/** Real heliocentric positions of Mercury–Neptune on a date (YYYY-MM-DD). */
+export function usePlanets(date: string | null) {
+  return useQuery<{ planets: PlanetPosition[]; accuracy_note: string }>({
+    queryKey: ['planets', date],
+    queryFn: async () => {
+      const res = await fetch(`${API_BASE}/api/v1/planets?date=${encodeURIComponent(date!)}`);
+      if (!res.ok) throw new Error(res.statusText);
+      return res.json();
+    },
+    enabled: !!date,
+    staleTime: 60 * 60 * 1000,
+    placeholderData: keepPreviousData,
   });
 }

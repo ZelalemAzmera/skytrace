@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { Observation, Candidate } from '../types';
+import type { PlanetXSceneData } from '../lib/planetXScale';
 
 export interface HoveredSkyObject {
   name: string;
@@ -46,6 +47,9 @@ export interface SkyState {
   // Hypothetical Planet X direction and 3D orbit on the sky / orrery
   planetXMarker: { ra: number; dec: number; name: string } | null;
   setPlanetXMarker: (m: { ra: number; dec: number; name: string } | null) => void;
+  // Planet X orbit + planets (log-scaled comparison drawn in the 3D view)
+  planetXScene: PlanetXSceneData | null;
+  setPlanetXScene: (d: PlanetXSceneData | null) => void;
   planetXOrbitPath: [number, number, number][] | null;
   setPlanetXOrbitPath: (p: [number, number, number][] | null) => void;
 
@@ -108,6 +112,8 @@ export const useSkyStore = create<SkyState>((set) => ({
 
   planetXMarker: null,
   setPlanetXMarker: (planetXMarker) => set({ planetXMarker }),
+  planetXScene: null,
+  setPlanetXScene: (planetXScene) => set({ planetXScene }),
   planetXOrbitPath: null,
   setPlanetXOrbitPath: (planetXOrbitPath) => set({ planetXOrbitPath }),
 

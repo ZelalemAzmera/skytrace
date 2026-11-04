@@ -1,4 +1,5 @@
 """Hypothetical Planet X: orbit size, mass and position on a timeline (calculated by space_object_explorer)."""
+import argparse
 from fastapi import APIRouter, HTTPException, Query
 
 router = APIRouter(prefix="/api/v1/planet-x", tags=["planet-x"])
@@ -22,7 +23,7 @@ async def planet_x(
         from space_object_explorer import planet_x_report  # backend root module
         return planet_x_report(start, end, step, a=a, e=e, inc=inc, node=node, arg_peri=arg_peri,
                                M0_deg=m0, epoch=epoch, mass_earth=mass_earth)
-    except ValueError as exc:
+    except (ValueError, argparse.ArgumentTypeError) as exc:
         raise HTTPException(status_code=422, detail=str(exc))
     except Exception as exc:  # pragma: no cover
         raise HTTPException(status_code=500, detail=str(exc))
