@@ -59,7 +59,11 @@ export default function ExplorePage() {
             NASA IRSA SPHEREx QR3 Live Archive
           </div>
           <button
-            onClick={() => setShowPlanetX((v) => !v)}
+            onClick={() => {
+              // opening Planet X clears the bottom dock so the centre of the globe is visible
+              if (!showPlanetX) setDrawerExpanded(false);
+              setShowPlanetX((v) => !v);
+            }}
             className={`px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all ${
               showPlanetX
                 ? 'bg-[#ff3df2] text-[#060810] border-transparent'
