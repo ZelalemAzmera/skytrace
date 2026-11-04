@@ -2,14 +2,17 @@ services:
   - type: web
     name: skytrace-backend
     runtime: python
-    region: oregon
+    rootDir: backend
     plan: free
-    branch: main
-    buildCommand: pip install -r backend/requirements.txt
-    startCommand: cd backend && uvicorn main:app --host 0.0.0.0 --port $PORT
+    region: oregon
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
     envVars:
       - key: PYTHON_VERSION
-        value: 3.11.9
+        value: 3.12.3
+      - key: ALLOWED_ORIGINS
+        value: https://skytrace-five.vercel.app,http://localhost:3000,http://127.0.0.1:3000
       - key: DATABASE_URL
         value: sqlite+aiosqlite:///./data/skytrace.db
       - key: LOG_LEVEL

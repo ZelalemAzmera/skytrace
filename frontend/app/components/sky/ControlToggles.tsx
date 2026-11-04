@@ -1,961 +1,190 @@
 'use client';
 
-import React, { useEffect, useRef } from 'react';
-import * as THREE from 'three';
-import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
+import React from 'react';
 import { useSkyStore } from '../../store/skyStore';
 import {
-  icrsToUnitVector,
-  vectorToIcrs,
-  equatorialToGalactic,
-  equatorialToEcliptic,
-  BRIGHT_STARS,
-  PLANET_ORBITS,
-  keplerToCartesian,
-  getJulianDate,
-} from '../../lib/astrometry';
-import { eclipticToScene, PLANET_COLORS } from '../../lib/planetXScale';
-import type { PlanetXSceneData } from '../../lib/planetXScale';
+  Layers,
+  CircleDot,
+  RotateCw,
+  Sun,
+  Orbit,
+  Eye,
+  SlidersHorizontal,
+  Telescope,
+  Compass,
+  ShieldAlert,
+  Maximize2,
+  Box,
+} from 'lucide-react';
 
-interface CelestialSphereProps {
-  onCoordinateClick?: (ra: number, dec: number) => void;
-  className?: string;
-}
-
-export default function CelestialSphere({ onCoordinateClick, className }: CelestialSphereProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
+export default function ControlToggles() {
   const {
-    ra,
-    dec,
     viewMode,
+    setViewMode,
     showSunExclusion,
     showBoresight,
+    show3DImageRelief,
+    showObservationVolume,
+    showTeardown,
     showEquatorialGrid,
     showEclipticGrid,
     showGalacticPlane,
     showOrrery,
     showScanPath,
     autoRotate,
-    setCoordinates,
-    setHoveredObject,
-    planetXMarker,
-    planetXScene,
+    toggleSetting,
   } = useSkyStore();
 
-  const storeValuesRef = useRef({
-    ra,
-    dec,
-    viewMode,
-    showSunExclusion,
-    showBoresight,
-    showEquatorialGrid,
-    showEclipticGrid,
-    showGalacticPlane,
-    showOrrery,
-    showScanPath,
-    autoRotate,
-    planetXMarker,
-    planetXScene,
-  });
-
-  useEffect(() => {
-    storeValuesRef.current = {
-      ra,
-      dec,
-      viewMode,
-      showSunExclusion,
-      showBoresight,
-      showEquatorialGrid,
-      showEclipticGrid,
-      showGalacticPlane,
-      showOrrery,
-      showScanPath,
-      autoRotate,
-      planetXMarker,
-      planetXScene,
-    };
-  }, [
-    ra,
-    dec,
-    viewMode,
-    showSunExclusion,
-    showBoresight,
-    showEquatorialGrid,
-    showEclipticGrid,
-    showGalacticPlane,
-    showOrrery,
-    showScanPath,
-    autoRotate,
-    planetXMarker,
-    planetXScene,
-  ]);
-
-  useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
-
-    // --- 1. Scene, Camera, Renderer ---
-    const scene = new THREE.Scene();
-    scene.fog = new THREE.FogExp2(0x060810, 0.0015);
-
-    const camera = new THREE.PerspectiveCamera(
-      60,
-      container.clientWidth / container.clientHeight,
-      0.1,
-      2000
-    );
-    camera.position.set(0, 30, 160);
-
-    const renderer = new THREE.WebGLRenderer({
-      antialias: true,
-      alpha: true,
-      powerPreference: 'high-performance',
-    });
-    renderer.setSize(container.clientWidth, container.clientHeight);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.15;
-    container.appendChild(renderer.domElement);
-
-    const controls = new OrbitControls(camera, renderer.domElement);
-    controls.enableDamping = true;
-    controls.dampingFactor = 0.05;
-    controls.minDistance = 0.5;
-    controls.maxDistance = 320;
-    controls.autoRotate = autoRotate;
-    controls.autoRotateSpeed = 0.35;
-
-    // --- 1.5 Vacuum PBR Space Lighting ---
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
-    scene.add(ambientLight);
-
-    const sunDirLight = new THREE.DirectionalLight(0xfff6ea, 3.2);
-    sunDirLight.position.set(80, 50, 100);
-    scene.add(sunDirLight);
-
-    const earthShineLight = new THREE.DirectionalLight(0x3a6088, 1.0);
-    earthShineLight.position.set(-60, -30, -80);
-    scene.add(earthShineLight);
-
-    // --- 2. Celestial Sphere Mesh ---
-    const sphereRadius = 100;
-    const sphereGeo = new THREE.SphereGeometry(sphereRadius, 64, 48);
-    const sphereMat = new THREE.MeshBasicMaterial({
-      color: 0x050c1e,
-      side: THREE.BackSide,
-      transparent: true,
-      opacity: 0.18,
-      wireframe: false,
-    });
-    const sphereMesh = new THREE.Mesh(sphereGeo, sphereMat);
-    scene.add(sphereMesh);
-
-    // --- 2.5 Authentic NASA Spitzer 3D Spacecraft & Boresight Ray ---
-    const spacecraftGroup = new THREE.Group();
-    spacecraftGroup.visible = false; // hidden until Spacecraft mode is selected
-    scene.add(spacecraftGroup);
-
-    // Boresight line-of-sight laser ray along +Z (aperture vector)
-    const rayLength = sphereRadius * 0.985;
-    const rayGeo = new THREE.CylinderGeometry(0.06, 0.3, rayLength, 8);
-    rayGeo.translate(0, rayLength / 2, 0);
-    rayGeo.rotateX(Math.PI / 2);
-    const rayMat = new THREE.MeshBasicMaterial({
-      color: 0x00e5ff,
-      transparent: true,
-      opacity: 0.65,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
-    });
-    const boresightRay = new THREE.Mesh(rayGeo, rayMat);
-    spacecraftGroup.add(boresightRay);
-
-    // 85° Solar Exclusion Cone (Cryogenic Thermal Limit)
-    // Points toward directional sunlight vector
-    const sunVector = new THREE.Vector3(80, 50, 100).normalize();
-    const coneGeo = new THREE.ConeGeometry(55, 65, 32, 1, true);
-    coneGeo.translate(0, -32.5, 0);
-    coneGeo.rotateX(Math.PI / 2);
-    const coneMat = new THREE.MeshBasicMaterial({
-      color: 0xff9900,
-      transparent: true,
-      opacity: 0.12,
-      wireframe: true,
-      side: THREE.DoubleSide,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
-    });
-    const sunExclusionCone = new THREE.Mesh(coneGeo, coneMat);
-    sunExclusionCone.lookAt(sunVector);
-    sunExclusionCone.visible = false;
-    scene.add(sunExclusionCone);
-
-    // Load NASA Spitzer GLTF Model
-    const gltfLoader = new GLTFLoader();
-    gltfLoader.load(
-      '/models/spitzer/SPITZER.gltf',
-      (gltf) => {
-        const model = gltf.scene;
-        model.scale.set(1.4, 1.4, 1.4);
-        model.traverse((child) => {
-          if ((child as THREE.Mesh).isMesh) {
-            const m = child as THREE.Mesh;
-            if (m.material) {
-              const mat = m.material as THREE.MeshStandardMaterial;
-              mat.roughness = 0.35;
-              mat.metalness = 0.85;
-            }
-          }
-        });
-        spacecraftGroup.add(model);
-      },
-      undefined,
-      (err) => console.warn('NASA Spitzer GLTF model load error:', err)
-    );
-
-    // --- 3. Milky Way Great Circle Dust Band ---
-    const mwCount = 9000;
-    const mwPositions = new Float32Array(mwCount * 3);
-    const mwColors = new Float32Array(mwCount * 3);
-
-    // Galactic Pole constants
-    const alphaG = (192.85948 * Math.PI) / 180;
-    const deltaG = (27.12825 * Math.PI) / 180;
-    const ngp = new THREE.Vector3(
-      Math.cos(deltaG) * Math.cos(alphaG),
-      Math.sin(deltaG),
-      Math.cos(deltaG) * Math.sin(alphaG)
-    );
-
-    // Any vector orthogonal to NGP
-    const gU = new THREE.Vector3(0, 1, 0).cross(ngp).normalize();
-    const gV = ngp.clone().cross(gU).normalize();
-
-    for (let i = 0; i < mwCount; i++) {
-      const angle = Math.random() * Math.PI * 2;
-      // Gaussian scatter around galactic latitude
-      const bRad = (Math.random() - 0.5) * (Math.random() - 0.5) * 0.45;
-      const cosB = Math.cos(bRad);
-      const sinB = Math.sin(bRad);
-
-      const r = sphereRadius * (0.97 + Math.random() * 0.02);
-      const dir = gU
-        .clone()
-        .multiplyScalar(Math.cos(angle) * cosB)
-        .add(gV.clone().multiplyScalar(Math.sin(angle) * cosB))
-        .add(ngp.clone().multiplyScalar(sinB))
-        .normalize()
-        .multiplyScalar(r);
-
-      mwPositions[i * 3] = dir.x;
-      mwPositions[i * 3 + 1] = dir.y;
-      mwPositions[i * 3 + 2] = dir.z;
-
-      // Color palette: soft violet, cyan-blue, and cosmic gold
-      const t = Math.random();
-      if (t < 0.4) {
-        mwColors[i * 3] = 0.45;
-        mwColors[i * 3 + 1] = 0.55;
-        mwColors[i * 3 + 2] = 0.95; // Blue
-      } else if (t < 0.75) {
-        mwColors[i * 3] = 0.75;
-        mwColors[i * 3 + 1] = 0.45;
-        mwColors[i * 3 + 2] = 0.9; // Purple
-      } else {
-        mwColors[i * 3] = 0.95;
-        mwColors[i * 3 + 1] = 0.75;
-        mwColors[i * 3 + 2] = 0.45; // Amber
-      }
-    }
-
-    const mwGeo = new THREE.BufferGeometry();
-    mwGeo.setAttribute('position', new THREE.BufferAttribute(mwPositions, 3));
-    mwGeo.setAttribute('color', new THREE.BufferAttribute(mwColors, 3));
-    const mwMat = new THREE.PointsMaterial({
-      size: 0.65,
-      vertexColors: true,
-      transparent: true,
-      opacity: 0.45,
-      blending: THREE.AdditiveBlending,
-    });
-    const mwPoints = new THREE.Points(mwGeo, mwMat);
-    scene.add(mwPoints);
-
-    // --- 4. Real Star Field (Bright Stars + Background Catalog) ---
-    const bgStarCount = 2000;
-    const totalStarCount = BRIGHT_STARS.length + bgStarCount;
-    const starPositions = new Float32Array(totalStarCount * 3);
-    const starColors = new Float32Array(totalStarCount * 3);
-    const starSizes = new Float32Array(totalStarCount);
-
-    // Bright catalog stars
-    BRIGHT_STARS.forEach((star, idx) => {
-      const pos = icrsToUnitVector(star.ra, star.dec, sphereRadius * 0.985);
-      starPositions[idx * 3] = pos.x;
-      starPositions[idx * 3 + 1] = pos.y;
-      starPositions[idx * 3 + 2] = pos.z;
-
-      const color = new THREE.Color(star.colorHex);
-      starColors[idx * 3] = color.r;
-      starColors[idx * 3 + 1] = color.g;
-      starColors[idx * 3 + 2] = color.b;
-
-      // Brightness scaling from apparent magnitude
-      const magScale = Math.max(1.8, (3.5 - star.mag) * 0.8);
-      starSizes[idx] = magScale;
-    });
-
-    // Background random stars
-    for (let i = 0; i < bgStarCount; i++) {
-      const idx = BRIGHT_STARS.length + i;
-      const bRa = Math.random() * 360;
-      const bDec = (Math.asin(Math.random() * 2 - 1) * 180) / Math.PI;
-      const pos = icrsToUnitVector(bRa, bDec, sphereRadius * 0.985);
-
-      starPositions[idx * 3] = pos.x;
-      starPositions[idx * 3 + 1] = pos.y;
-      starPositions[idx * 3 + 2] = pos.z;
-
-      const brightness = 0.4 + Math.random() * 0.6;
-      starColors[idx * 3] = brightness * 0.9;
-      starColors[idx * 3 + 1] = brightness * 0.95;
-      starColors[idx * 3 + 2] = brightness;
-      starSizes[idx] = 0.5 + Math.random() * 0.7;
-    }
-
-    const starGeo = new THREE.BufferGeometry();
-    starGeo.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
-    starGeo.setAttribute('color', new THREE.BufferAttribute(starColors, 3));
-    const starMat = new THREE.PointsMaterial({
-      size: 1.2,
-      vertexColors: true,
-      transparent: true,
-      opacity: 0.85,
-      blending: THREE.AdditiveBlending,
-    });
-    const starPoints = new THREE.Points(starGeo, starMat);
-    scene.add(starPoints);
-
-    // --- 5. Coordinate Grids (Equatorial, Ecliptic, Galactic) ---
-    const gridGroup = new THREE.Group();
-    scene.add(gridGroup);
-
-    // 5a. Celestial Equator (Dec = 0)
-    const eqPts: THREE.Vector3[] = [];
-    for (let i = 0; i <= 180; i++) {
-      const a = (i / 180) * Math.PI * 2;
-      eqPts.push(
-        new THREE.Vector3(
-          sphereRadius * 0.99 * Math.cos(a),
-          0,
-          sphereRadius * 0.99 * Math.sin(a)
-        )
-      );
-    }
-    const eqGeo = new THREE.BufferGeometry().setFromPoints(eqPts);
-    const eqMat = new THREE.LineBasicMaterial({
-      color: 0x00e5ff,
-      transparent: true,
-      opacity: 0.35,
-    });
-    const equatorLine = new THREE.Line(eqGeo, eqMat);
-    gridGroup.add(equatorLine);
-
-    // 5b. Dec parallels (+-30°, +-60°)
-    [-60, -30, 30, 60].forEach((decDeg) => {
-      const dPts: THREE.Vector3[] = [];
-      const decRad = (decDeg * Math.PI) / 180;
-      const rDec = sphereRadius * 0.99 * Math.cos(decRad);
-      const yDec = sphereRadius * 0.99 * Math.sin(decRad);
-      for (let i = 0; i <= 90; i++) {
-        const a = (i / 90) * Math.PI * 2;
-        dPts.push(new THREE.Vector3(rDec * Math.cos(a), yDec, rDec * Math.sin(a)));
-      }
-      const dGeo = new THREE.BufferGeometry().setFromPoints(dPts);
-      const dMat = new THREE.LineBasicMaterial({
-        color: 0x00e5ff,
-        transparent: true,
-        opacity: 0.12,
-      });
-      gridGroup.add(new THREE.Line(dGeo, dMat));
-    });
-
-    // 5c. RA meridians (every 2 hours = 30°)
-    for (let h = 0; h < 24; h += 2) {
-      const mPts: THREE.Vector3[] = [];
-      const raDeg = h * 15;
-      for (let d = -80; d <= 80; d += 2) {
-        mPts.push(icrsToUnitVector(raDeg, d, sphereRadius * 0.99));
-      }
-      const mGeo = new THREE.BufferGeometry().setFromPoints(mPts);
-      const mMat = new THREE.LineBasicMaterial({
-        color: 0x00e5ff,
-        transparent: true,
-        opacity: 0.1,
-      });
-      gridGroup.add(new THREE.Line(mGeo, mMat));
-    }
-
-    // 5d. Ecliptic Plane (Gold great circle, inclined 23.44°)
-    const eclipticGroup = new THREE.Group();
-    scene.add(eclipticGroup);
-    const ecPts: THREE.Vector3[] = [];
-    const epsRad = (23.4392911 * Math.PI) / 180;
-    for (let i = 0; i <= 180; i++) {
-      const l = (i / 180) * Math.PI * 2;
-      const x = sphereRadius * 0.988 * Math.cos(l);
-      const y = sphereRadius * 0.988 * Math.sin(l) * Math.sin(epsRad);
-      const z = sphereRadius * 0.988 * Math.sin(l) * Math.cos(epsRad);
-      ecPts.push(new THREE.Vector3(x, y, z));
-    }
-    const ecGeo = new THREE.BufferGeometry().setFromPoints(ecPts);
-    const ecMat = new THREE.LineBasicMaterial({
-      color: 0xffd166,
-      transparent: true,
-      opacity: 0.35,
-    });
-    eclipticGroup.add(new THREE.Line(ecGeo, ecMat));
-
-    // 5e. Galactic Plane (Purple great circle, b = 0)
-    const galacticGroup = new THREE.Group();
-    scene.add(galacticGroup);
-    const galPts: THREE.Vector3[] = [];
-    for (let i = 0; i <= 180; i++) {
-      const a = (i / 180) * Math.PI * 2;
-      const pt = gU
-        .clone()
-        .multiplyScalar(Math.cos(a))
-        .add(gV.clone().multiplyScalar(Math.sin(a)))
-        .normalize()
-        .multiplyScalar(sphereRadius * 0.986);
-      galPts.push(pt);
-    }
-    const galGeo = new THREE.BufferGeometry().setFromPoints(galPts);
-    const galMat = new THREE.LineBasicMaterial({
-      color: 0x9d4edd,
-      transparent: true,
-      opacity: 0.4,
-    });
-    galacticGroup.add(new THREE.Line(galGeo, galMat));
-
-    // --- 6. SPHEREx Scan Path (Animated Ring) ---
-    const scanGroup = new THREE.Group();
-    scene.add(scanGroup);
-    const scanRadius = sphereRadius * 0.982;
-    const scanPts: THREE.Vector3[] = [];
-    for (let i = 0; i <= 120; i++) {
-      const a = (i / 120) * Math.PI * 2;
-      scanPts.push(new THREE.Vector3(scanRadius * Math.cos(a), 0, scanRadius * Math.sin(a)));
-    }
-    const scanGeo = new THREE.BufferGeometry().setFromPoints(scanPts);
-    const scanMat = new THREE.LineBasicMaterial({
-      color: 0xff6b35,
-      transparent: true,
-      opacity: 0.65,
-      linewidth: 2,
-    });
-    const scanRing = new THREE.Line(scanGeo, scanMat);
-    // Align scan ring with SPHEREx sun-synchronous orbit
-    scanRing.rotation.x = Math.PI / 2.2;
-    scanGroup.add(scanRing);
-
-    // --- 7. Solar System Orrery (Kepler Orbits & Planets) ---
-    const orreryGroup = new THREE.Group();
-    scene.add(orreryGroup);
-
-    // Central Sun
-    const sunGeo = new THREE.SphereGeometry(1.2, 16, 16);
-    const sunMat = new THREE.MeshBasicMaterial({ color: 0xfff07c });
-    const sunMesh = new THREE.Mesh(sunGeo, sunMat);
-    orreryGroup.add(sunMesh);
-
-    // Planetary orbit lines and planet meshes
-    const planetMeshes: { mesh: THREE.Mesh; orbit: (typeof PLANET_ORBITS)[0] }[] = [];
-    PLANET_ORBITS.forEach((orbit) => {
-      const pts: THREE.Vector3[] = [];
-      for (let m = 0; m <= 360; m += 4) {
-        pts.push(
-          keplerToCartesian(orbit.a, orbit.e, orbit.i, orbit.omega, orbit.Omega, m, 6.0)
-        );
-      }
-      const oGeo = new THREE.BufferGeometry().setFromPoints(pts);
-      const oMat = new THREE.LineBasicMaterial({
-        color: orbit.color,
-        transparent: true,
-        opacity: 0.25,
-      });
-      orreryGroup.add(new THREE.Line(oGeo, oMat));
-
-      const pGeo = new THREE.SphereGeometry(orbit.size * 0.45, 12, 12);
-      const pMat = new THREE.MeshBasicMaterial({ color: orbit.color });
-      const pMesh = new THREE.Mesh(pGeo, pMat);
-      orreryGroup.add(pMesh);
-      planetMeshes.push({ mesh: pMesh, orbit });
-    });
-
-    // --- 8. Selected Target Reticle & Candidate Markers ---
-    const targetGroup = new THREE.Group();
-    scene.add(targetGroup);
-
-    // Concentric reticle rings
-    const ring1Geo = new THREE.RingGeometry(1.4, 1.8, 32);
-    const ring1Mat = new THREE.MeshBasicMaterial({
-      color: 0x00e5ff,
-      side: THREE.DoubleSide,
-      transparent: true,
-      opacity: 0.8,
-    });
-    const ring1 = new THREE.Mesh(ring1Geo, ring1Mat);
-
-    const ring2Geo = new THREE.RingGeometry(2.4, 2.7, 32);
-    const ring2Mat = new THREE.MeshBasicMaterial({
-      color: 0x00e5ff,
-      side: THREE.DoubleSide,
-      transparent: true,
-      opacity: 0.4,
-    });
-    const ring2 = new THREE.Mesh(ring2Geo, ring2Mat);
-
-    targetGroup.add(ring1);
-    targetGroup.add(ring2);
-
-    // Hypothetical Planet X marker (magenta), placed at its sky direction for the selected date
-    const planetXGroup = new THREE.Group();
-    planetXGroup.visible = false;
-    scene.add(planetXGroup);
-    const pxMat = new THREE.MeshBasicMaterial({ color: 0xff3df2, side: THREE.DoubleSide, transparent: true, opacity: 0.9 });
-    planetXGroup.add(new THREE.Mesh(new THREE.RingGeometry(1.6, 2.1, 32), pxMat));
-    planetXGroup.add(new THREE.Mesh(new THREE.CircleGeometry(0.5, 16), pxMat));
-
-    // --- Planet X comparison view: Sun, 8 planets and Planet X on one log-radial scale ---
-    const compareGroup = new THREE.Group();
-    compareGroup.visible = false;
-    scene.add(compareGroup);
-    const compareSun = new THREE.Mesh(new THREE.SphereGeometry(1.6, 16, 16), new THREE.MeshBasicMaterial({ color: 0xfff07c }));
-    compareGroup.add(compareSun);
-    const compareDynamic = new THREE.Group();
-    compareGroup.add(compareDynamic);
-    let lastCompareScene: PlanetXSceneData | null = null;
-
-    const makeLabel = (text: string, color: string): THREE.Sprite => {
-      const cv = document.createElement('canvas');
-      cv.width = 256; cv.height = 64;
-      const cx = cv.getContext('2d')!;
-      cx.font = 'bold 30px monospace';
-      cx.fillStyle = color;
-      cx.textAlign = 'left';
-      cx.textBaseline = 'middle';
-      cx.fillText(text, 6, 32);
-      const tex = new THREE.CanvasTexture(cv);
-      const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false }));
-      sp.scale.set(24, 6, 1);
-      sp.center.set(0, 0.5);
-      return sp;
-    };
-
-    const clearCompare = () => {
-      while (compareDynamic.children.length) {
-        const ch = compareDynamic.children[0] as THREE.Object3D & { geometry?: THREE.BufferGeometry; material?: THREE.Material & { map?: THREE.Texture } };
-        compareDynamic.remove(ch);
-        ch.geometry?.dispose();
-        ch.material?.map?.dispose();
-        ch.material?.dispose();
-      }
-    };
-
-    const rebuildCompare = (sc: PlanetXSceneData | null) => {
-      clearCompare();
-      if (!sc) return;
-      sc.planets.forEach((pl) => {
-        const col = PLANET_COLORS[pl.name] ?? '#ffffff';
-        const ringPts: THREE.Vector3[] = [];
-        for (let k = 0; k <= 128; k++) {
-          const t = (2 * Math.PI * k) / 128;
-          ringPts.push(eclipticToScene(pl.a * Math.cos(t), pl.a * Math.sin(t), 0));
-        }
-        compareDynamic.add(new THREE.Line(
-          new THREE.BufferGeometry().setFromPoints(ringPts),
-          new THREE.LineBasicMaterial({ color: col, transparent: true, opacity: 0.45 })
-        ));
-        const dot = new THREE.Mesh(new THREE.SphereGeometry(1.0, 12, 12), new THREE.MeshBasicMaterial({ color: col }));
-        const dp = eclipticToScene(...pl.pos);
-        dot.position.copy(dp);
-        compareDynamic.add(dot);
-        const lb = makeLabel(pl.name, col);
-        lb.position.copy(dp).add(new THREE.Vector3(1.6, 1.2, 0));
-        compareDynamic.add(lb);
-      });
-      const orbitPts = sc.path.map(([x, y, z]) => eclipticToScene(x, y, z));
-      compareDynamic.add(new THREE.Line(
-        new THREE.BufferGeometry().setFromPoints(orbitPts),
-        new THREE.LineBasicMaterial({ color: 0xff3df2 })
-      ));
-      const px = new THREE.Mesh(new THREE.SphereGeometry(2.0, 16, 16), new THREE.MeshBasicMaterial({ color: 0xff3df2 }));
-      const pxp = eclipticToScene(...sc.pos);
-      px.position.copy(pxp);
-      compareDynamic.add(px);
-      const pl = makeLabel('Planet X', '#ff3df2');
-      pl.position.copy(pxp).add(new THREE.Vector3(2.4, 1.6, 0));
-      compareDynamic.add(pl);
-    };
-
-    // Sample Known Transient Candidates on Sphere
-    const sampleCandidates = [
-      { id: 'cand-001', ra: 83.8221, dec: -5.3911, confidence: 0.87, type: 'Y-Dwarf' },
-      { id: 'cand-002', ra: 84.15, dec: -5.20, confidence: 0.92, type: 'High Proper Motion' },
-      { id: 'cand-003', ra: 266.4168, dec: -29.0078, confidence: 0.64, type: 'IR Flare' },
-      { id: 'cand-004', ra: 56.75, dec: 24.1167, confidence: 0.78, type: 'Variable Star' },
-      { id: 'cand-005', ra: 270.0, dec: 66.56, confidence: 0.95, type: 'NEP Transient' },
-    ];
-
-    const candidateMeshes: { mesh: THREE.Mesh; data: (typeof sampleCandidates)[0] }[] = [];
-    sampleCandidates.forEach((cand) => {
-      const pos = icrsToUnitVector(cand.ra, cand.dec, sphereRadius * 0.984);
-      const cRingGeo = new THREE.RingGeometry(0.9, 1.3, 24);
-      const cRingMat = new THREE.MeshBasicMaterial({
-        color: cand.confidence >= 0.7 ? 0x06d6a0 : 0xffd166,
-        side: THREE.DoubleSide,
-        transparent: true,
-        opacity: 0.75,
-      });
-      const cMesh = new THREE.Mesh(cRingGeo, cRingMat);
-      cMesh.position.copy(pos);
-      cMesh.lookAt(new THREE.Vector3(0, 0, 0));
-      scene.add(cMesh);
-      candidateMeshes.push({ mesh: cMesh, data: cand });
-    });
-
-    // --- 9. Raycasting Interaction ---
-    const raycaster = new THREE.Raycaster();
-    raycaster.params.Points = { threshold: 1.5 };
-    const mouse = new THREE.Vector2();
-
-    const handlePointerMove = (e: MouseEvent) => {
-      const rect = renderer.domElement.getBoundingClientRect();
-      mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-      mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
-
-      raycaster.setFromCamera(mouse, camera);
-
-      // Planet hover: name, time and orbital speed (screen-space pick, planets are tiny)
-      if (storeValuesRef.current.showOrrery && !storeValuesRef.current.planetXScene) {
-        const px = e.clientX - rect.left;
-        const py = e.clientY - rect.top;
-        let best: { d: number; mesh: THREE.Mesh; orbit: (typeof PLANET_ORBITS)[0] } | null = null;
-        planetMeshes.forEach(({ mesh, orbit }) => {
-          const ndc = mesh.position.clone().project(camera);
-          if (ndc.z > 1) return; // behind camera
-          const sx = ((ndc.x + 1) / 2) * rect.width;
-          const sy = ((1 - ndc.y) / 2) * rect.height;
-          const d = Math.hypot(sx - px, sy - py);
-          if (d < 16 && (!best || d < best.d)) best = { d, mesh, orbit };
-        });
-        if (best) {
-          const { mesh, orbit } = best as { d: number; mesh: THREE.Mesh; orbit: (typeof PLANET_ORBITS)[0] };
-          const rAu = mesh.position.length() / 6.0; // scene units -> AU (orrery scale = 6)
-          // vis-viva: v = 29.7847 km/s * sqrt(2/r - 1/a)  (1 AU circular speed)
-          const vKms = 29.7847 * Math.sqrt(Math.max(0, 2 / rAu - 1 / orbit.a));
-          const when = new Date().toISOString().replace('T', ' ').slice(0, 19) + ' UTC';
-          const dir = vectorToIcrs(mesh.position.clone().normalize().multiplyScalar(sphereRadius));
-          setHoveredObject({
-            name: orbit.name,
-            ra: dir.ra,
-            dec: dir.dec,
-            type: 'Planet',
-            extra: `${when} | Speed: ${vKms.toFixed(2)} km/s | Sun dist: ${rAu.toFixed(3)} AU | Period: ${(orbit.periodDays / 365.25).toFixed(2)} yr`,
-          });
-          renderer.domElement.style.cursor = 'pointer';
-          return;
-        }
-      }
-
-      // Check candidate hover
-      const candHits = raycaster.intersectObjects(candidateMeshes.map((c) => c.mesh));
-      if (candHits.length > 0) {
-        const hitMesh = candHits[0].object as THREE.Mesh;
-        const candData = candidateMeshes.find((c) => c.mesh === hitMesh)?.data;
-        if (candData) {
-          setHoveredObject({
-            name: `${candData.id} (${candData.type})`,
-            ra: candData.ra,
-            dec: candData.dec,
-            type: 'Candidate',
-            extra: `Confidence: ${(candData.confidence * 100).toFixed(0)}%`,
-          });
-          renderer.domElement.style.cursor = 'pointer';
-          return;
-        }
-      }
-
-      // Check bright stars hover
-      const starHits = raycaster.intersectObject(starPoints);
-      if (starHits.length > 0 && starHits[0].index !== undefined) {
-        const starIdx = starHits[0].index;
-        if (starIdx < BRIGHT_STARS.length) {
-          const star = BRIGHT_STARS[starIdx];
-          setHoveredObject({
-            name: `${star.name} (${star.spectralType})`,
-            ra: star.ra,
-            dec: star.dec,
-            type: 'Star',
-            extra: `V-Mag: ${star.mag}`,
-          });
-          renderer.domElement.style.cursor = 'pointer';
-          return;
-        }
-      }
-
-      // Check empty sphere intersection for coordinates
-      const sphereHits = raycaster.intersectObject(sphereMesh);
-      if (sphereHits.length > 0) {
-        const hitPt = sphereHits[0].point;
-        const coords = vectorToIcrs(hitPt);
-        setHoveredObject({
-          name: 'Celestial Coordinate',
-          ra: coords.ra,
-          dec: coords.dec,
-          type: 'Point',
-        });
-        renderer.domElement.style.cursor = 'crosshair';
-        return;
-      }
-
-      setHoveredObject(null);
-      renderer.domElement.style.cursor = 'default';
-    };
-
-    const handleClick = (e: MouseEvent) => {
-      const rect = renderer.domElement.getBoundingClientRect();
-      mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-      mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
-
-      raycaster.setFromCamera(mouse, camera);
-
-      // Click on candidate
-      const candHits = raycaster.intersectObjects(candidateMeshes.map((c) => c.mesh));
-      if (candHits.length > 0) {
-        const hitMesh = candHits[0].object as THREE.Mesh;
-        const candData = candidateMeshes.find((c) => c.mesh === hitMesh)?.data;
-        if (candData) {
-          setCoordinates(candData.ra, candData.dec, candData.id);
-          if (onCoordinateClick) onCoordinateClick(candData.ra, candData.dec);
-          return;
-        }
-      }
-
-      // Click on celestial sphere
-      const sphereHits = raycaster.intersectObject(sphereMesh);
-      if (sphereHits.length > 0) {
-        const hitPt = sphereHits[0].point;
-        const coords = vectorToIcrs(hitPt);
-        setCoordinates(
-          Math.round(coords.ra * 10000) / 10000,
-          Math.round(coords.dec * 10000) / 10000
-        );
-        if (onCoordinateClick) {
-          onCoordinateClick(coords.ra, coords.dec);
-        }
-      }
-    };
-
-    renderer.domElement.addEventListener('mousemove', handlePointerMove);
-    renderer.domElement.addEventListener('click', handleClick);
-
-    // --- 10. Resize Observer ---
-    const resizeObserver = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        const { width, height } = entry.contentRect;
-        if (width === 0 || height === 0) return;
-        camera.aspect = width / height;
-        camera.updateProjectionMatrix();
-        renderer.setSize(width, height);
-      }
-    });
-    resizeObserver.observe(container);
-
-    // --- 11. Animation Loop ---
-    let animationId: number;
-    let clock = new THREE.Clock();
-    let lastViewMode = storeValuesRef.current.viewMode;
-    let transitionFrames = 0;
-    let lastCmpActive = false;
-
-    const animate = () => {
-      animationId = requestAnimationFrame(animate);
-      const elapsed = clock.getElapsedTime();
-
-      // Update OrbitControls
-      controls.autoRotate = storeValuesRef.current.autoRotate;
-      controls.update();
-
-      // Visibility toggles from store
-      gridGroup.visible = storeValuesRef.current.showEquatorialGrid;
-      eclipticGroup.visible = storeValuesRef.current.showEclipticGrid;
-      galacticGroup.visible = storeValuesRef.current.showGalacticPlane;
-      const cmp = storeValuesRef.current.planetXScene;
-      orreryGroup.visible = storeValuesRef.current.showOrrery && !cmp; // compare view replaces the orrery
-      compareGroup.visible = !!cmp;
-      if (cmp !== lastCompareScene) {
-        lastCompareScene = cmp;
-        rebuildCompare(cmp);
-      }
-      scanGroup.visible = storeValuesRef.current.showScanPath;
-
-      // Rotate SPHEREx scan ring
-      if (storeValuesRef.current.showScanPath) {
-        scanGroup.rotation.y = elapsed * 0.08;
-      }
-
-      // Update Planet positions via Kepler solver
-      if (storeValuesRef.current.showOrrery) {
-        const jd = getJulianDate();
-        planetMeshes.forEach(({ mesh, orbit }) => {
-          // Mean anomaly rate (deg/day)
-          const mDeg = ((jd - 2451545.0) * (360.0 / orbit.periodDays)) % 360;
-          const pos = keplerToCartesian(
-            orbit.a,
-            orbit.e,
-            orbit.i,
-            orbit.omega,
-            orbit.Omega,
-            mDeg,
-            6.0
-          );
-          mesh.position.copy(pos);
-        });
-      }
-
-      // Update Selected Reticle Position
-      const targetPos = icrsToUnitVector(
-        storeValuesRef.current.ra,
-        storeValuesRef.current.dec,
-        sphereRadius * 0.985
-      );
-      targetGroup.position.copy(targetPos);
-      targetGroup.lookAt(new THREE.Vector3(0, 0, 0));
-
-      // Planet X sky marker
-      const pxm = storeValuesRef.current.planetXMarker;
-      planetXGroup.visible = !!pxm;
-      if (pxm) {
-        planetXGroup.position.copy(icrsToUnitVector(pxm.ra, pxm.dec, sphereRadius * 0.985));
-        planetXGroup.lookAt(new THREE.Vector3(0, 0, 0));
-      }
-
-      // --- Spacecraft Slew: Smoothly rotate model along +Z aperture to point at target RA/Dec ---
-      const targetDir = icrsToUnitVector(
-        storeValuesRef.current.ra,
-        storeValuesRef.current.dec,
-        1.0
-      ).normalize();
-      const modelAperture = new THREE.Vector3(0, 0, 1);
-      const targetQuat = new THREE.Quaternion().setFromUnitVectors(modelAperture, targetDir);
-      spacecraftGroup.quaternion.slerp(targetQuat, 0.06);
-
-      // Spacecraft is hidden until selected; when active it orbits Earth and the camera follows it
-      const isSc = storeValuesRef.current.viewMode === 'spacecraft';
-      spacecraftGroup.visible = isSc;
-      boresightRay.visible = isSc && storeValuesRef.current.showBoresight;
-      sunExclusionCone.visible = isSc && storeValuesRef.current.showSunExclusion;
-      const earthEntry = planetMeshes.find((p) => p.orbit.name === 'Earth');
-      if (earthEntry) {
-        spacecraftGroup.position.copy(earthEntry.mesh.position);
-        sunExclusionCone.position.copy(earthEntry.mesh.position);
-      }
-
-      // View mode transitions: camera is moved once on a mode change, then zoom is free
-      if (!!cmp !== lastCmpActive) {
-        lastCmpActive = !!cmp;
-        transitionFrames = 90; // re-frame the camera when the Planet X comparison opens/closes
-      }
-      if (lastViewMode !== storeValuesRef.current.viewMode) {
-        lastViewMode = storeValuesRef.current.viewMode;
-        transitionFrames = 90;
-      }
-      if (isSc) {
-        controls.minDistance = 2;
-        controls.maxDistance = 65;
-        const sc = spacecraftGroup.position;
-        if (transitionFrames > 0) {
-          camera.position.lerp(sc.clone().add(new THREE.Vector3(12, 12, 20)), 0.06);
-          transitionFrames--;
-        }
-        controls.target.lerp(sc, 0.1); // zoom toward the satellite
-      } else {
-        controls.minDistance = 0.5; // no hard cap: can zoom right in on the Sun / planets
-        controls.maxDistance = 320;
-        if (transitionFrames > 0) {
-          camera.position.lerp(cmp ? new THREE.Vector3(0, 80, 250) : new THREE.Vector3(0, 30, 160), 0.06);
-          transitionFrames--;
-        }
-        controls.target.lerp(new THREE.Vector3(0, 0, 0), 0.1); // zoom toward the Sun
-      }
-
-      // Pulse reticle
-      const scale1 = 1.0 + Math.sin(elapsed * 3) * 0.08;
-      const scale2 = 1.0 + Math.cos(elapsed * 2.5) * 0.12;
-      ring1.scale.set(scale1, scale1, 1);
-      ring2.scale.set(scale2, scale2, 1);
-
-      // Pulse sample candidates
-      candidateMeshes.forEach(({ mesh }, idx) => {
-        const cScale = 1.0 + Math.sin(elapsed * 3.5 + idx) * 0.15;
-        mesh.scale.set(cScale, cScale, 1);
-      });
-
-      renderer.render(scene, camera);
-    };
-
-    animate();
-
-    // --- 12. Cleanup on Unmount ---
-    return () => {
-      cancelAnimationFrame(animationId);
-      resizeObserver.disconnect();
-      renderer.domElement.removeEventListener('mousemove', handlePointerMove);
-      renderer.domElement.removeEventListener('click', handleClick);
-
-      controls.dispose();
-      sphereGeo.dispose();
-      sphereMat.dispose();
-      mwGeo.dispose();
-      mwMat.dispose();
-      starGeo.dispose();
-      starMat.dispose();
-      eqGeo.dispose();
-      eqMat.dispose();
-      ecGeo.dispose();
-      ecMat.dispose();
-      galGeo.dispose();
-      galMat.dispose();
-      scanGeo.dispose();
-      scanMat.dispose();
-      sunGeo.dispose();
-      sunMat.dispose();
-      ring1Geo.dispose();
-      ring1Mat.dispose();
-      ring2Geo.dispose();
-      ring2Mat.dispose();
-      rayGeo.dispose();
-      rayMat.dispose();
-      coneGeo.dispose();
-      coneMat.dispose();
-
-      if (container.contains(renderer.domElement)) {
-        container.removeChild(renderer.domElement);
-      }
-      renderer.dispose();
-    };
-  }, []);
+  const toggleItems = [
+    {
+      key: 'showBoresight' as const,
+      label: 'Boresight Laser Ray',
+      active: showBoresight,
+      color: 'var(--accent-cyan)',
+      icon: <Compass className="w-3.5 h-3.5" />,
+    },
+    {
+      key: 'showObservationVolume' as const,
+      label: '3D Optical Frustum (3.5°×7°)',
+      active: showObservationVolume,
+      color: '#38bdf8',
+      icon: <Maximize2 className="w-3.5 h-3.5" />,
+    },
+    {
+      key: 'show3DImageRelief' as const,
+      label: '3D Telescope Image Relief',
+      active: show3DImageRelief,
+      color: 'var(--accent-gold)',
+      icon: <Layers className="w-3.5 h-3.5" />,
+    },
+    {
+      key: 'showTeardown' as const,
+      label: '3D Optical Teardown',
+      active: showTeardown,
+      color: '#c084fc',
+      icon: <Box className="w-3.5 h-3.5" />,
+    },
+    {
+      key: 'showSunExclusion' as const,
+      label: 'Sun Exclusion Cone (85°)',
+      active: showSunExclusion,
+      color: 'var(--accent-orange)',
+      icon: <ShieldAlert className="w-3.5 h-3.5" />,
+    },
+    {
+      key: 'showEquatorialGrid' as const,
+      label: 'Equatorial Grid (α, δ)',
+      active: showEquatorialGrid,
+      color: 'var(--accent-cyan)',
+      icon: <CircleDot className="w-3.5 h-3.5" />,
+    },
+    {
+      key: 'showEclipticGrid' as const,
+      label: 'Ecliptic Plane (λ, β)',
+      active: showEclipticGrid,
+      color: 'var(--accent-gold)',
+      icon: <Orbit className="w-3.5 h-3.5" />,
+    },
+    {
+      key: 'showGalacticPlane' as const,
+      label: 'Galactic Plane (l, b)',
+      active: showGalacticPlane,
+      color: 'var(--accent-purple)',
+      icon: <Layers className="w-3.5 h-3.5" />,
+    },
+    {
+      key: 'showOrrery' as const,
+      label: 'Solar System Orrery',
+      active: showOrrery,
+      color: 'var(--accent-gold)',
+      icon: <Sun className="w-3.5 h-3.5" />,
+    },
+    {
+      key: 'showScanPath' as const,
+      label: 'SPHEREx Scan Cadence',
+      active: showScanPath,
+      color: 'var(--accent-orange)',
+      icon: <Eye className="w-3.5 h-3.5" />,
+    },
+    {
+      key: 'autoRotate' as const,
+      label: 'Auto Turntable',
+      active: autoRotate,
+      color: 'var(--accent-green)',
+      icon: <RotateCw className="w-3.5 h-3.5" />,
+    },
+  ];
 
   return (
-    <div
-      ref={containerRef}
-      className={`relative w-full h-full overflow-hidden select-none ${className || ''}`}
-      style={{
-        background: 'radial-gradient(ellipse at center, #0a1128 0%, #060810 75%, #030408 100%)',
-      }}
-    />
+    <div className="absolute top-28 lg:top-16 right-4 z-20 flex flex-col gap-2 pointer-events-auto max-w-[calc(100vw-2rem)] max-h-[calc(100vh-8rem)] lg:max-h-[calc(100vh-5rem)] overflow-y-auto">
+      {/* 1. Observation View Mode Switcher */}
+      <div className="glass-panel p-2 backdrop-blur-md">
+        <div className="text-[10px] font-mono uppercase tracking-wider text-[var(--text-muted)] mb-1.5 px-1">
+          Observation Mode
+        </div>
+        <div className="grid grid-cols-2 gap-1 p-0.5 rounded-lg bg-[rgba(6,8,16,0.6)] border border-[var(--border-subtle)]">
+          <button
+            onClick={() => setViewMode('sky')}
+            className={`py-1 px-2 rounded-md text-xs font-mono font-medium flex items-center justify-center gap-1.5 transition-all ${
+              viewMode === 'sky'
+                ? 'bg-[var(--accent-cyan)] text-[#060810] font-bold shadow-[0_0_12px_rgba(0,229,255,0.4)]'
+                : 'text-[var(--text-secondary)] hover:text-white'
+            }`}
+          >
+            <Eye className="w-3.5 h-3.5" />
+            <span>Sky Survey</span>
+          </button>
+          <button
+            onClick={() => setViewMode('spacecraft')}
+            className={`py-1 px-2 rounded-md text-xs font-mono font-medium flex items-center justify-center gap-1.5 transition-all ${
+              viewMode === 'spacecraft'
+                ? 'bg-[var(--accent-cyan)] text-[#060810] font-bold shadow-[0_0_12px_rgba(0,229,255,0.4)]'
+                : 'text-[var(--text-secondary)] hover:text-white'
+            }`}
+          >
+            <Telescope className="w-3.5 h-3.5" />
+            <span>SPHEREx</span>
+          </button>
+        </div>
+      </div>
+
+      {/* 2. Layer Toggles */}
+      <div className="glass-panel p-2.5 backdrop-blur-md">
+        <div className="flex items-center gap-2 mb-2 pb-1.5 border-b border-[var(--border-subtle)] text-[11px] font-mono uppercase tracking-wider text-[var(--text-secondary)]">
+          <SlidersHorizontal className="w-3.5 h-3.5 text-[var(--accent-cyan)]" />
+          <span>Layer Toggles</span>
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          {toggleItems.map((item) => (
+            <button
+              key={item.key}
+              onClick={() => toggleSetting(item.key)}
+              className={`flex items-center justify-between gap-3 px-2 py-1 rounded text-xs font-mono transition-all ${
+                item.active
+                  ? 'bg-[rgba(255,255,255,0.08)] text-[var(--text-primary)] border border-[var(--border-subtle)]'
+                  : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)] opacity-60'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <span style={{ color: item.active ? item.color : 'inherit' }}>
+                  {item.icon}
+                </span>
+                <span>{item.label}</span>
+              </div>
+              <span
+                className={`w-2 h-2 rounded-full ${
+                  item.active ? 'shadow-[0_0_8px]' : 'bg-[var(--border-subtle)]'
+                }`}
+                style={{
+                  backgroundColor: item.active ? item.color : undefined,
+                  boxShadow: item.active ? `0 0 8px ${item.color}` : undefined,
+                }}
+              />
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
   );
 }

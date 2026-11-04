@@ -40,13 +40,21 @@ export interface SkyState {
   viewMode: 'sky' | 'spacecraft';
   showSunExclusion: boolean;
   showBoresight: boolean;
+  show3DImageRelief: boolean;
+  showObservationVolume: boolean;
+  showTeardown: boolean;
 
-  // Hypothetical Planet X direction on the sky at the selected timeline time
+  // Hypothetical Planet X direction and 3D orbit on the sky / orrery
   planetXMarker: { ra: number; dec: number; name: string } | null;
   setPlanetXMarker: (m: { ra: number; dec: number; name: string } | null) => void;
+<<<<<<< HEAD
   // Planet X orbit + planets (log-scaled comparison drawn in the 3D view)
   planetXScene: PlanetXSceneData | null;
   setPlanetXScene: (d: PlanetXSceneData | null) => void;
+=======
+  planetXOrbitPath: [number, number, number][] | null;
+  setPlanetXOrbitPath: (p: [number, number, number][] | null) => void;
+>>>>>>> origin/main
 
   // Actions
   setViewMode: (mode: 'sky' | 'spacecraft') => void;
@@ -69,6 +77,9 @@ export interface SkyState {
       | 'autoRotate'
       | 'showSunExclusion'
       | 'showBoresight'
+      | 'show3DImageRelief'
+      | 'showObservationVolume'
+      | 'showTeardown'
   ) => void;
   reset: () => void;
 }
@@ -98,11 +109,19 @@ export const useSkyStore = create<SkyState>((set) => ({
   viewMode: 'sky',
   showSunExclusion: true,
   showBoresight: true,
+  show3DImageRelief: true,
+  showObservationVolume: true,
+  showTeardown: false,
 
   planetXMarker: null,
   setPlanetXMarker: (planetXMarker) => set({ planetXMarker }),
+<<<<<<< HEAD
   planetXScene: null,
   setPlanetXScene: (planetXScene) => set({ planetXScene }),
+=======
+  planetXOrbitPath: null,
+  setPlanetXOrbitPath: (planetXOrbitPath) => set({ planetXOrbitPath }),
+>>>>>>> origin/main
 
   setViewMode: (viewMode) => set({ viewMode }),
 

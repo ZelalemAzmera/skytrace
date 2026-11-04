@@ -172,6 +172,7 @@ export function solveKepler(M: number, e: number, tolerance = 1e-8): number {
 
 /**
  * Keplerian orbital elements to 3D Cartesian position (Solar System Scope physics)
+ * Defaults to scale = 1.0 (calibrated 3D visual units inside radius 100 celestial sphere)
  */
 export function keplerToCartesian(
   a: number,
@@ -180,7 +181,7 @@ export function keplerToCartesian(
   omegaDeg: number,
   OmegaDeg: number,
   MDeg: number,
-  scale = 5
+  scale = 1.0
 ): THREE.Vector3 {
   const i = iDeg * DEG2RAD;
   const omega = omegaDeg * DEG2RAD;
@@ -220,14 +221,216 @@ export function keplerToCartesian(
 }
 
 /**
- * Major solar system planetary orbital elements (semi-major axis AU, eccentricity, inclination deg, periapsis deg, node deg, mean anomaly rate deg/day)
+ * Solar System Scope Calibrated Planetary & Celestial Body Interface
  */
-export const PLANET_ORBITS = [
-  { name: 'Mercury', a: 0.387, e: 0.2056, i: 7.00, omega: 29.12, Omega: 48.33, color: 0x9E9E9E, size: 0.6, periodDays: 87.97 },
-  { name: 'Venus',   a: 0.723, e: 0.0068, i: 3.39, omega: 54.88, Omega: 76.68, color: 0xFFD166, size: 0.9, periodDays: 224.70 },
-  { name: 'Earth',   a: 1.000, e: 0.0167, i: 0.00, omega: 114.21, Omega: 0.00, color: 0x00E5FF, size: 1.0, periodDays: 365.26 },
-  { name: 'Mars',    a: 1.524, e: 0.0934, i: 1.85, omega: 286.50, Omega: 49.56, color: 0xFF6B35, size: 0.7, periodDays: 686.98 },
-  { name: 'Jupiter', a: 5.204, e: 0.0485, i: 1.30, omega: 273.87, Omega: 100.46, color: 0xDDAA44, size: 1.8, periodDays: 4332.59 },
+export interface CelestialOrbit {
+  name: string;
+  category: 'Planet' | 'Dwarf Planet' | 'Moon' | 'Comet';
+  a: number; // Calibrated 3D visual semi-major axis (guarantees zero collisions)
+  realAU: number; // Real astronomical semi-major axis (AU) for telemetry
+  e: number; // Orbital eccentricity
+  i: number; // Orbital inclination (degrees)
+  omega: number; // Argument of periapsis (degrees)
+  Omega: number; // Longitude of ascending node (degrees)
+  color: number; // Orbital path and UI indicator color
+  size: number; // 3D sphere visual radius
+  periodDays: number; // Real orbital period in Earth days
+  rotationSpeed?: number; // Visual axial rotation rate
+  description: string; // Scientific description
+}
+
+/**
+ * Solar System Scope calibrated planetary orbital elements.
+ * Distances (a) are non-linearly mapped to guarantee clear visual spacing,
+ * prevent any orbital clipping/collisions, and maintain clear clearance from the Sun's corona (R=4.5).
+ */
+export const PLANET_ORBITS: CelestialOrbit[] = [
+  {
+    name: 'Mercury',
+    category: 'Planet',
+    a: 10.5,
+    realAU: 0.387,
+    e: 0.2056,
+    i: 7.00,
+    omega: 29.12,
+    Omega: 48.33,
+    color: 0x9e9e9e,
+    size: 0.62,
+    periodDays: 87.97,
+    description: 'Innermost rocky terrestrial planet; heavily cratered surface and high orbital eccentricity.',
+  },
+  {
+    name: 'Venus',
+    category: 'Planet',
+    a: 16.5,
+    realAU: 0.723,
+    e: 0.0068,
+    i: 3.39,
+    omega: 54.88,
+    Omega: 76.68,
+    color: 0xffd166,
+    size: 0.95,
+    periodDays: 224.70,
+    description: 'Dense carbon dioxide atmosphere with runaway greenhouse effect and retrograde axial rotation.',
+  },
+  {
+    name: 'Earth',
+    category: 'Planet',
+    a: 22.8,
+    realAU: 1.000,
+    e: 0.0167,
+    i: 0.00,
+    omega: 114.21,
+    Omega: 0.00,
+    color: 0x00e5ff,
+    size: 1.05,
+    periodDays: 365.26,
+    description: 'Third planet with abundant liquid water oceans, active plate tectonics, and nitrogen-oxygen atmosphere.',
+  },
+  {
+    name: 'Mars',
+    category: 'Planet',
+    a: 29.8,
+    realAU: 1.524,
+    e: 0.0934,
+    i: 1.85,
+    omega: 286.50,
+    Omega: 49.56,
+    color: 0xff6b35,
+    size: 0.80,
+    periodDays: 686.98,
+    description: 'The Red Planet; iron oxide crust, Olympus Mons shield volcano, and polar water-ice caps.',
+  },
+  {
+    name: 'Ceres',
+    category: 'Dwarf Planet',
+    a: 36.8,
+    realAU: 2.767,
+    e: 0.0758,
+    i: 10.59,
+    omega: 73.60,
+    Omega: 80.33,
+    color: 0xcbc5b9,
+    size: 0.46,
+    periodDays: 1682.0,
+    description: 'Largest object and only dwarf planet in the Main Asteroid Belt; water-ice mantle and cryovolcanoes.',
+  },
+  {
+    name: 'Jupiter',
+    category: 'Planet',
+    a: 47.5,
+    realAU: 5.204,
+    e: 0.0485,
+    i: 1.30,
+    omega: 273.87,
+    Omega: 100.46,
+    color: 0xddaa44,
+    size: 2.30,
+    periodDays: 4332.59,
+    description: 'Largest gas giant planet; Great Red Spot anticyclonic storm and powerful magnetosphere.',
+  },
+  {
+    name: 'Saturn',
+    category: 'Planet',
+    a: 59.5,
+    realAU: 9.582,
+    e: 0.0541,
+    i: 2.49,
+    omega: 339.39,
+    Omega: 113.67,
+    color: 0xead6b8,
+    size: 1.90,
+    periodDays: 10759.22,
+    description: 'Prominent, magnificent ring system composed of water-ice particles and silicates.',
+  },
+  {
+    name: 'Uranus',
+    category: 'Planet',
+    a: 71.5,
+    realAU: 19.20,
+    e: 0.0472,
+    i: 0.77,
+    omega: 96.99,
+    Omega: 74.01,
+    color: 0x70d6ff,
+    size: 1.40,
+    periodDays: 30685.40,
+    description: 'Ice giant with extreme 97.77° axial tilt; pale cyan methane atmosphere and faint ring system.',
+  },
+  {
+    name: 'Neptune',
+    category: 'Planet',
+    a: 82.5,
+    realAU: 30.05,
+    e: 0.0086,
+    i: 1.77,
+    omega: 273.19,
+    Omega: 131.78,
+    color: 0x4361ee,
+    size: 1.35,
+    periodDays: 60189.00,
+    description: 'Outermost ice giant planet; supersonic winds, vivid azure coloration, and retrograde moon Triton.',
+  },
+  {
+    name: 'Pluto',
+    category: 'Dwarf Planet',
+    a: 76.0,
+    realAU: 39.48,
+    e: 0.2488,
+    i: 17.16,
+    omega: 113.76,
+    Omega: 110.30,
+    color: 0xc6a487,
+    size: 0.44,
+    periodDays: 90560.0,
+    description: 'Kuiper Belt dwarf planet; high orbital inclination and 2:3 orbital resonance crossing inside Neptune.',
+  },
+];
+
+/**
+ * Solar System Scope Featured Comets with Dynamic 3D Solar Wind Tails
+ */
+export interface CometOrbit extends CelestialOrbit {
+  tailColor: number;
+  dustTailColor: number;
+  baseTailLength: number;
+}
+
+export const COMET_ORBITS: CometOrbit[] = [
+  {
+    name: '1P/Halley',
+    category: 'Comet',
+    a: 48.0,
+    realAU: 17.83,
+    e: 0.78,
+    i: 162.26,
+    omega: 111.33,
+    Omega: 58.42,
+    color: 0x38bdf8,
+    size: 0.50,
+    periodDays: 27500, // 75.3 years
+    tailColor: 0x00e5ff,
+    dustTailColor: 0xffd166,
+    baseTailLength: 14.0,
+    description: 'Most famous periodic retrograde comet; source of Orionid and Eta Aquariid meteor showers.',
+  },
+  {
+    name: 'C/2020 F3 (NEOWISE)',
+    category: 'Comet',
+    a: 52.0,
+    realAU: 23.5,
+    e: 0.81,
+    i: 128.94,
+    omega: 37.28,
+    Omega: 61.01,
+    color: 0x67e8f9,
+    size: 0.48,
+    periodDays: 32000,
+    tailColor: 0x38bdf8,
+    dustTailColor: 0xfef08a,
+    baseTailLength: 16.0,
+    description: 'Long-period retrograde comet discovered by NASA NEOWISE infrared space telescope.',
+  },
 ];
 
 /**

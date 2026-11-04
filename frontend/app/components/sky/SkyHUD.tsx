@@ -15,7 +15,6 @@ import {
   searchCatalog,
   resolveObjectName,
   ResolvedTarget,
-  ASTRONOMICAL_CATALOG,
 } from '../../lib/resolver';
 import {
   Compass,
@@ -24,10 +23,11 @@ import {
   Navigation,
   Globe,
   Search,
-  CheckCircle,
   Telescope,
   ShieldCheck,
   ShieldAlert,
+  Layers,
+  Box,
 } from 'lucide-react';
 
 export default function SkyHUD() {
@@ -39,6 +39,8 @@ export default function SkyHUD() {
     hoveredObject,
     setCoordinates,
     setSelectedBand,
+    showTeardown,
+    show3DImageRelief,
   } = useSkyStore();
 
   const [inputRa, setInputRa] = useState<string>(ra.toFixed(4));
@@ -277,7 +279,7 @@ export default function SkyHUD() {
         <div className="flex items-center justify-between pb-1.5 mb-2 border-b border-[var(--border-subtle)]">
           <div className="flex items-center gap-1.5 text-xs font-bold text-[var(--text-primary)]">
             <Telescope className="w-3.5 h-3.5 text-[var(--accent-cyan)]" />
-            <span>Spitzer Spacecraft CTA</span>
+            <span>SPHEREx Spacecraft CTA</span>
           </div>
           <span
             className={`text-[9px] font-mono px-1.5 py-0.5 rounded uppercase font-semibold ${
@@ -286,14 +288,14 @@ export default function SkyHUD() {
                 : 'bg-[rgba(0,229,255,0.1)] text-[var(--accent-cyan)] border border-[rgba(0,229,255,0.3)]'
             }`}
           >
-            {viewMode === 'spacecraft' ? 'Close Orbit' : 'Boresight Lock'}
+            {viewMode === 'spacecraft' ? 'LEO Orbit' : 'Boresight Lock'}
           </span>
         </div>
 
         <div className="grid grid-cols-2 gap-2 text-xs font-mono">
           <div>
             <div className="text-[10px] text-[var(--text-muted)]">Cryo Assembly</div>
-            <div className="text-[var(--text-primary)] font-semibold text-[11px]">1.4K L-He Dewar</div>
+            <div className="text-[var(--text-primary)] font-semibold text-[11px]">&lt; 80K V-Groove</div>
           </div>
           <div>
             <div className="text-[10px] text-[var(--text-muted)]">Solar Margin</div>
@@ -307,17 +309,43 @@ export default function SkyHUD() {
               ) : (
                 <ShieldAlert className="w-3 h-3 text-[var(--accent-orange)] animate-pulse" />
               )}
-              <span>{sunSepAngle.toFixed(1)}° ({isSunSafe ? 'Safe' : 'Limit'})</span>
+              <span>{sunSepAngle.toFixed(1)}° ({isSunSafe ? 'Nominal' : 'Limit'})</span>
             </div>
           </div>
         </div>
 
         <div className="mt-2 pt-1.5 border-t border-[var(--border-subtle)] text-[10px] font-mono flex items-center justify-between text-[var(--text-secondary)]">
-          <span>Target Alignment</span>
+          <span>700 km Polar LEO</span>
           <span className="text-[var(--accent-cyan)] font-semibold">
             {ra.toFixed(2)}°, {dec.toFixed(2)}°
           </span>
         </div>
+
+        {/* 3D Optical Teardown Details */}
+        {showTeardown && (
+          <div className="mt-2 pt-2 border-t border-[rgba(192,132,252,0.3)] bg-[rgba(192,132,252,0.06)] -mx-3 -mb-3 p-2.5 rounded-b">
+            <div className="text-[10px] font-mono text-[#c084fc] font-bold uppercase tracking-wider mb-1 flex items-center gap-1">
+              <Box className="w-3 h-3 text-[#c084fc]" />
+              <span>3D Optical Teardown</span>
+            </div>
+            <div className="grid grid-cols-2 gap-1.5 text-[10px] font-mono text-[var(--text-secondary)]">
+              <div>• 20cm f/3.0 Gold Mirror</div>
+              <div>• 6x H2RG Focal Arrays</div>
+              <div>• 102 Band LVF Filters</div>
+              <div>• 3.5° × 7.0° Frustum</div>
+            </div>
+          </div>
+        )}
+
+        {/* 3D Image Relief Telemetry */}
+        {show3DImageRelief && !showTeardown && (
+          <div className="mt-2 pt-2 border-t border-[rgba(255,215,0,0.25)] bg-[rgba(255,215,0,0.04)] -mx-3 -mb-3 p-2 rounded-b flex items-center justify-between text-[10px] font-mono text-[var(--text-secondary)]">
+            <span className="flex items-center gap-1 text-[var(--accent-gold)]">
+              <Layers className="w-3 h-3" /> 3D Image Relief:
+            </span>
+            <span className="text-[var(--text-primary)] font-semibold">102-Band Tomography</span>
+          </div>
+        )}
       </div>
 
       {/* Hovered Object Telemetry Card */}

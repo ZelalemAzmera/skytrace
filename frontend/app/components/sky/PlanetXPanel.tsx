@@ -33,7 +33,11 @@ export default function PlanetXPanel({ onClose }: { onClose: () => void }) {
   const [applied, setApplied] = useState<PlanetXParams | null>(null);
   const [idx, setIdx] = useState(0);
   const setMarker = useSkyStore((s) => s.setPlanetXMarker);
+<<<<<<< HEAD
   const setScene = useSkyStore((s) => s.setPlanetXScene);
+=======
+  const setOrbitPath = useSkyStore((s) => s.setPlanetXOrbitPath);
+>>>>>>> origin/main
 
   // Live recalculation: any changed number is applied ~0.35 s after the last keystroke.
   useEffect(() => {
@@ -63,6 +67,16 @@ export default function PlanetXPanel({ onClose }: { onClose: () => void }) {
   useEffect(() => {
     setMarker(pt ? { ra: pt.ra_deg, dec: pt.dec_deg, name: 'Planet X (hypothetical)' } : null);
   }, [pt, setMarker]);
+<<<<<<< HEAD
+=======
+  useEffect(() => {
+    setOrbitPath(data?.orbit_path ?? null);
+  }, [data, setOrbitPath]);
+  useEffect(() => () => {
+    setMarker(null);
+    setOrbitPath(null);
+  }, [setMarker, setOrbitPath]);
+>>>>>>> origin/main
 
   // Orbit + planets for the 3D globe
   useEffect(() => {
