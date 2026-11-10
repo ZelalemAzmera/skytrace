@@ -203,7 +203,6 @@ export default function PlanetXPanel({ onClose }: { onClose: () => void }) {
               <div>Earth distance {fmt(pt.geocentric_distance_au, 1)} AU</div>
               <div>RA {formatRA(pt.ra_deg)} · Dec {formatDec(pt.dec_deg)}</div>
               <div className="text-[var(--text-muted)]">xyz = ({fmt(pt.x_au, 1)}, {fmt(pt.y_au, 1)}, {fmt(pt.z_au, 1)}) AU</div>
-              <div className="text-[#ff3df2] mt-1">Globe: the orbit, the planets and Planet X are drawn on the same log scale; the magenta ring on the sky shows its direction.</div>
             </div>
           </div>
           <p className="text-[10px] text-[var(--text-muted)] mt-2 leading-snug">{data.assumptions.note} {sm.mass_note} Planet positions: astropy built-in ephemeris (≈ arc-minute accuracy).</p>
