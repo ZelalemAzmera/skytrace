@@ -2295,22 +2295,35 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
             dustUniforms.uTime.value = cometTime;
           }
 
-          // Solar distance and anti-solar direction (away from Sun at 0,0,0)
+          // Compute heading direction (where comet is heading along orbit) & opposite direction (-v)
+          const posAhead = keplerToCartesian(
+            orbit.a,
+            orbit.e,
+            orbit.i,
+            orbit.omega,
+            orbit.Omega,
+            mDeg + 0.04,
+            1.0
+          );
+          const heading = posAhead.clone().sub(pos).normalize();
+          const backwardMotionDir = heading.clone().negate(); // Opposite of heading
+
+          // Solar distance and anti-solar vector
           const rSun = pos.length();
           const antiSolar = pos.clone().normalize();
 
-          // Tail length scales dramatically with solar wind & proximity (majestic 22-75 unit billowing plume)
+          // Tail length scales dramatically with solar proximity (majestic 22-75 unit billowing plume)
           const tailLen = Math.max(22.0, Math.min(75.0, 240.0 / Math.sqrt(Math.max(1.0, rSun))));
           const tailWidth = 0.45 + (15.0 / rSun) * 0.55;
 
-          // Ion Tail: Straight plasma beam pointing strictly away from Sun
+          // Ion Tail: Flaming plasma beam streaming strictly opposite to motion direction (-v)
           ionTail.position.copy(pos);
           const defaultUp = new THREE.Vector3(0, 1, 0);
-          ionTail.quaternion.setFromUnitVectors(defaultUp, antiSolar);
+          ionTail.quaternion.setFromUnitVectors(defaultUp, backwardMotionDir);
           ionTail.scale.set(tailWidth, tailLen, tailWidth);
 
-          // Dust Tail: Warm golden tail slightly lagging behind orbit track
-          const dustDir = antiSolar.clone().add(new THREE.Vector3(-antiSolar.z * 0.22, 0, antiSolar.x * 0.22)).normalize();
+          // Dust Tail: Warm golden flame streaming backwards with subtle solar-wind fanning
+          const dustDir = backwardMotionDir.clone().multiplyScalar(0.85).add(antiSolar.clone().multiplyScalar(0.15)).normalize();
           dustTail.position.copy(pos);
           dustTail.quaternion.setFromUnitVectors(defaultUp, dustDir);
           dustTail.scale.set(tailWidth * 1.35, tailLen * 0.82, tailWidth * 1.35);
