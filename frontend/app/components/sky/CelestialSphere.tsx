@@ -26,6 +26,10 @@ import {
   easeOutCubic,
 } from '../../lib/astrometry';
 import { eclipticToOrrery } from '../../lib/planetXScale';
+import {
+  createCometFlameTailMaterial,
+  createCometFlamingComaMaterial,
+} from '../../lib/cometShaders';
 
 interface CelestialSphereProps {
   onCoordinateClick?: (ra: number, dec: number) => void;
@@ -1458,52 +1462,36 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
       trailLine.computeLineDistances();
       orreryGroup.add(trailLine);
 
-      // Nucleus
-      const nGeo = new THREE.SphereGeometry(comet.size, 16, 12);
+      // Nucleus: compact icy/rocky core with subtle metallic sheen
+      const nGeo = new THREE.SphereGeometry(comet.size * 0.22, 16, 12);
       const nMat = new THREE.MeshStandardMaterial({
-        color: 0x334155,
-        roughness: 0.9,
+        color: 0x1e293b,
+        roughness: 0.85,
+        metalness: 0.1,
       });
       const nucleus = new THREE.Mesh(nGeo, nMat);
       orreryGroup.add(nucleus);
 
-      // Coma (glowing atmosphere)
-      const comaGeo = new THREE.SphereGeometry(comet.size * 2.2, 16, 16);
-      const comaMat = new THREE.MeshBasicMaterial({
-        color: comet.tailColor,
-        transparent: true,
-        opacity: 0.75,
-        blending: THREE.AdditiveBlending,
-        depthWrite: false,
-      });
+      // Coma: ethereal shimmering coronal atmosphere
+      const comaGeo = new THREE.SphereGeometry(comet.size * 1.15, 32, 32);
+      const comaMat = createCometFlamingComaMaterial(comet.tailColor);
       const coma = new THREE.Mesh(comaGeo, comaMat);
       orreryGroup.add(coma);
 
-      // Dynamic 3D Ion Tail (cylinder aligned anti-solar)
-      const ionGeo = new THREE.CylinderGeometry(0.12, 1.2, 1.0, 16, 1, true);
+      // Dynamic 3D Ion Tail (Flaming Billowing Plasma Beam)
+      // radiusTop = 2.4 (expanding plume), radiusBottom = 0.22 (nucleus base), height = 1.0
+      // 32 radial segments and 24 height segments for smooth organic wave flutter
+      const ionGeo = new THREE.CylinderGeometry(2.4, 0.22, 1.0, 32, 24, true);
       ionGeo.translate(0, 0.5, 0); // origin at base of nucleus
-      const ionMat = new THREE.MeshBasicMaterial({
-        color: comet.tailColor,
-        transparent: true,
-        opacity: 0.5,
-        side: THREE.DoubleSide,
-        blending: THREE.AdditiveBlending,
-        depthWrite: false,
-      });
+      const ionMat = createCometFlameTailMaterial('ion', comet.tailColor);
       const ionTail = new THREE.Mesh(ionGeo, ionMat);
       orreryGroup.add(ionTail);
 
-      // Dynamic 3D Dust Tail (lagging golden tail)
-      const dustGeo = new THREE.CylinderGeometry(0.18, 1.8, 1.0, 16, 1, true);
+      // Dynamic 3D Dust Tail (Flaming Billowing Golden Dust Plume)
+      // radiusTop = 3.6, radiusBottom = 0.32, height = 1.0
+      const dustGeo = new THREE.CylinderGeometry(3.6, 0.32, 1.0, 32, 24, true);
       dustGeo.translate(0, 0.5, 0);
-      const dustMat = new THREE.MeshBasicMaterial({
-        color: comet.dustTailColor,
-        transparent: true,
-        opacity: 0.35,
-        side: THREE.DoubleSide,
-        blending: THREE.AdditiveBlending,
-        depthWrite: false,
-      });
+      const dustMat = createCometFlameTailMaterial('dust', comet.dustTailColor);
       const dustTail = new THREE.Mesh(dustGeo, dustMat);
       orreryGroup.add(dustTail);
 
@@ -1962,7 +1950,7 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
             `r: ${bestHit.rAu.toFixed(3)} AU`
           );
           hoverBadgeTex.needsUpdate = true;
-          planetHoverGroup.visible = true;
+          planetHoverGroup.visible = storeValuesRef.current.selectedCelestialBody?.name !== bestHit.name;
 
           const periodStr = bestHit.periodDays > 365.25
             ? `${(bestHit.periodDays / 365.25).toFixed(2)} yr`
@@ -2176,7 +2164,7 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
       }
       const cm = cometMeshes.find((c) => c.orbit.name === body.name);
       if (cm) {
-        return { pos: cm.nucleus.position.clone(), effectiveRadius: cm.orbit.size * 2.5 };
+        return { pos: cm.nucleus.position.clone(), effectiveRadius: cm.orbit.size * 1.6 };
       }
       return null;
     }
@@ -2292,13 +2280,28 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
           trailGeo.setColors(trailData.colors);
           trailLine.computeLineDistances();
 
+          // Animate Flaming Coma & Flame Tails with elapsed time + orbit phase offset
+          const cometTime = elapsed + (orbit.periodDays % 100) * 0.1;
+          const comaUniforms = (coma.material as THREE.ShaderMaterial).uniforms;
+          if (comaUniforms?.uTime) {
+            comaUniforms.uTime.value = cometTime;
+          }
+          const ionUniforms = (ionTail.material as THREE.ShaderMaterial).uniforms;
+          if (ionUniforms?.uTime) {
+            ionUniforms.uTime.value = cometTime;
+          }
+          const dustUniforms = (dustTail.material as THREE.ShaderMaterial).uniforms;
+          if (dustUniforms?.uTime) {
+            dustUniforms.uTime.value = cometTime;
+          }
+
           // Solar distance and anti-solar direction (away from Sun at 0,0,0)
           const rSun = pos.length();
           const antiSolar = pos.clone().normalize();
 
-          // Tail length scales dramatically as comet approaches perihelion (1/r scaling)
-          const tailLen = Math.max(6.0, Math.min(26.0, 160.0 / rSun));
-          const tailWidth = 0.25 + (20.0 / rSun) * 0.45;
+          // Tail length scales dramatically with solar wind & proximity (majestic 22-75 unit billowing plume)
+          const tailLen = Math.max(22.0, Math.min(75.0, 240.0 / Math.sqrt(Math.max(1.0, rSun))));
+          const tailWidth = 0.45 + (15.0 / rSun) * 0.55;
 
           // Ion Tail: Straight plasma beam pointing strictly away from Sun
           ionTail.position.copy(pos);
@@ -2307,10 +2310,10 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
           ionTail.scale.set(tailWidth, tailLen, tailWidth);
 
           // Dust Tail: Warm golden tail slightly lagging behind orbit track
-          const dustDir = antiSolar.clone().add(new THREE.Vector3(-antiSolar.z * 0.25, 0, antiSolar.x * 0.25)).normalize();
+          const dustDir = antiSolar.clone().add(new THREE.Vector3(-antiSolar.z * 0.22, 0, antiSolar.x * 0.22)).normalize();
           dustTail.position.copy(pos);
           dustTail.quaternion.setFromUnitVectors(defaultUp, dustDir);
-          dustTail.scale.set(tailWidth * 1.5, tailLen * 0.75, tailWidth * 1.5);
+          dustTail.scale.set(tailWidth * 1.35, tailLen * 0.82, tailWidth * 1.35);
         });
       }
 
@@ -2322,7 +2325,7 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
       );
       targetGroup.position.copy(targetPos);
       targetGroup.quaternion.copy(camera.quaternion);
-      targetGroup.visible = !isSpacecraftMode;
+      targetGroup.visible = !isSpacecraftMode && !storeValuesRef.current.selectedCelestialBody;
 
       // Planet X sky marker
       const pxm = storeValuesRef.current.planetXMarker;
@@ -2603,9 +2606,17 @@ export default function CelestialSphere({ onCoordinateClick, className }: Celest
       renderer.domElement.removeEventListener('dblclick', handleDblClick);
       cancelAnimationFrame(reqId);
 
-      cometMeshes.forEach(({ trailGeo, trailMat }) => {
+      cometMeshes.forEach(({ nucleus, coma, ionTail, dustTail, trailGeo, trailMat }) => {
         trailGeo.dispose();
         trailMat.dispose();
+        nucleus.geometry.dispose();
+        (nucleus.material as THREE.Material).dispose();
+        coma.geometry.dispose();
+        (coma.material as THREE.Material).dispose();
+        ionTail.geometry.dispose();
+        (ionTail.material as THREE.Material).dispose();
+        dustTail.geometry.dispose();
+        (dustTail.material as THREE.Material).dispose();
       });
 
       sphereGeo.dispose();
