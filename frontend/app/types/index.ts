@@ -89,3 +89,22 @@ export interface SkyPreset {
   description: string;
   category: 'Nebula' | 'Star Cluster' | 'Galactic' | 'Deep Survey' | 'Calibration';
 }
+
+export type CameraTransitionState =
+  | 'IDLE'
+  | 'TRANSITIONING_IN'
+  | 'TARGET_LOCKED'
+  | 'TRANSITIONING_OUT';
+
+export interface SelectedCelestialBody {
+  name: string;
+  category: 'Sun' | 'Planet' | 'Dwarf Planet' | 'Natural Satellite' | 'Comet';
+  radius: number;
+  effectiveRadius: number;
+  realAU?: number;
+  periodDays?: number;
+  vKms?: number;
+  description?: string;
+  color?: string;
+}
+

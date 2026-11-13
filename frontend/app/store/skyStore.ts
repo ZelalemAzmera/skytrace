@@ -1,5 +1,6 @@
 import { create } from 'zustand';
-import { Observation, Candidate } from '../types';
+import { Observation, Candidate, CameraTransitionState, SelectedCelestialBody } from '../types';
+import type { PlanetXSceneData } from '../lib/planetXScale';
 
 export interface HoveredSkyObject {
   name: string;
@@ -35,10 +36,28 @@ export interface SkyState {
   showStarLabels: boolean;
   autoRotate: boolean;
 
+  // Camera Transition & Celestial Body Selection (Solar System Scope)
+  selectedCelestialBody: SelectedCelestialBody | null;
+  cameraTransitionState: CameraTransitionState;
+  selectCelestialBody: (body: SelectedCelestialBody | null) => void;
+  resetCameraToOverview: () => void;
+
   // View Mode: Sky Survey vs Spacecraft Observation Geometry
   viewMode: 'sky' | 'spacecraft';
   showSunExclusion: boolean;
   showBoresight: boolean;
+  show3DImageRelief: boolean;
+  showObservationVolume: boolean;
+  showTeardown: boolean;
+
+  // Hypothetical Planet X direction and 3D orbit on the sky / orrery
+  planetXMarker: { ra: number; dec: number; name: string } | null;
+  setPlanetXMarker: (m: { ra: number; dec: number; name: string } | null) => void;
+  // Planet X orbit + planets (log-scaled comparison drawn in the 3D view)
+  planetXScene: PlanetXSceneData | null;
+  setPlanetXScene: (d: PlanetXSceneData | null) => void;
+  planetXOrbitPath: [number, number, number][] | null;
+  setPlanetXOrbitPath: (p: [number, number, number][] | null) => void;
 
   // Actions
   setViewMode: (mode: 'sky' | 'spacecraft') => void;
@@ -61,6 +80,9 @@ export interface SkyState {
       | 'autoRotate'
       | 'showSunExclusion'
       | 'showBoresight'
+      | 'show3DImageRelief'
+      | 'showObservationVolume'
+      | 'showTeardown'
   ) => void;
   reset: () => void;
 }
@@ -87,11 +109,40 @@ export const useSkyStore = create<SkyState>((set) => ({
   showStarLabels: true,
   autoRotate: true,
 
+  selectedCelestialBody: null,
+  cameraTransitionState: 'IDLE',
+  selectCelestialBody: (body) =>
+    set({
+      selectedCelestialBody: body,
+      cameraTransitionState: body ? 'TRANSITIONING_IN' : 'TRANSITIONING_OUT',
+    }),
+  resetCameraToOverview: () =>
+    set({
+      selectedCelestialBody: null,
+      cameraTransitionState: 'TRANSITIONING_OUT',
+    }),
+
   viewMode: 'sky',
   showSunExclusion: true,
   showBoresight: true,
+  show3DImageRelief: true,
+  showObservationVolume: true,
+  showTeardown: false,
 
-  setViewMode: (viewMode) => set({ viewMode }),
+  planetXMarker: null,
+  setPlanetXMarker: (planetXMarker) => set({ planetXMarker }),
+  planetXScene: null,
+  setPlanetXScene: (planetXScene) => set({ planetXScene }),
+  planetXOrbitPath: null,
+  setPlanetXOrbitPath: (planetXOrbitPath) => set({ planetXOrbitPath }),
+
+  setViewMode: (viewMode) =>
+    set({
+      viewMode,
+      ...(viewMode === 'spacecraft'
+        ? { selectedCelestialBody: null, cameraTransitionState: 'IDLE' }
+        : {}),
+    }),
 
   setCoordinates: (ra, dec, presetName) =>
     set({
@@ -120,5 +171,12 @@ export const useSkyStore = create<SkyState>((set) => ({
       selectedObsB: null,
       activeCandidate: null,
       hoveredObject: null,
+      selectedCelestialBody: null,
+      cameraTransitionState: 'IDLE',
     }),
 }));
+
+if (typeof window !== 'undefined') {
+  (window as any).__SKY_STORE__ = useSkyStore;
+}
+
