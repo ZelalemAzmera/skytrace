@@ -1,15 +1,12 @@
 'use client';
 
-import React, { useRef, useEffect, useState, useCallback } from 'react';
+import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import { Candidate } from '../../types';
 import { FALSE_COLOR_PRESETS, FalseColorPreset } from '../../lib/composite';
 import {
   ColormapMode,
   StretchMode,
   getColormapLUT,
-  asinhStretch,
-  logStretch,
-  linearStretch,
 } from '../../lib/imageProcessing';
 import {
   degreesToRaSexagesimal,
@@ -18,20 +15,13 @@ import {
 import {
   Play,
   Pause,
-  ZoomIn,
-  ZoomOut,
-  Maximize2,
-  Sliders,
-  Sparkles,
-  Info,
-  Layers,
-  Palette,
-  AlertTriangle,
   RotateCcw,
   SkipBack,
   SkipForward,
   Crosshair,
   Eye,
+  Sliders,
+  Palette,
 } from 'lucide-react';
 
 export type BlinkViewMode = 'blink' | 'slider' | 'difference' | 'false_color';
@@ -70,12 +60,15 @@ export default function BlinkViewer({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Images state
+  // Raw HTMLImageElements
   const imgARef = useRef<HTMLImageElement | null>(null);
   const imgBRef = useRef<HTMLImageElement | null>(null);
   const imgDiffRef = useRef<HTMLImageElement | null>(null);
   const imgFalseColorRef = useRef<HTMLImageElement | null>(null);
   const [imagesReady, setImagesReady] = useState(false);
+
+  // Offscreen recolored canvases cache for high-speed colormapping
+  const recoloredCanvasesRef = useRef<Map<string, HTMLCanvasElement>>(new Map());
 
   // Playback & view mode
   const [viewMode, setViewMode] = useState<BlinkViewMode>('blink');
@@ -85,15 +78,11 @@ export default function BlinkViewer({
   const [showingAState, setShowingAState] = useState(true);
   const [loopResetFlash, setLoopResetFlash] = useState(false);
 
-  // Astronomical Image Processing Controls (WiseView / Aladin Lite style)
+  // Astronomical Image Processing Controls
   const [colormap, setColormap] = useState<ColormapMode>('inverted_bw');
   const [stretchMode, setStretchMode] = useState<StretchMode>('asinh');
-  const [contrastCutoff, setContrastCutoff] = useState({ min: 0.02, max: 0.98 });
   const [showOverlays, setShowOverlays] = useState(true);
   const [showCrosshair, setShowCrosshair] = useState(true);
-
-  // False Color Preset state
-  const [selectedPreset, setSelectedPreset] = useState<FalseColorPreset>(FALSE_COLOR_PRESETS[0]);
 
   // Split slider
   const [sliderPosition, setSliderPosition] = useState(0.5); // 0.0 - 1.0
@@ -125,6 +114,8 @@ export default function BlinkViewer({
     const checkLoaded = () => {
       loadedCount++;
       if (loadedCount >= totalToLoad) {
+        // Clear cached recolored canvases when source images change
+        recoloredCanvasesRef.current.clear();
         setImagesReady(true);
       }
     };
@@ -144,6 +135,49 @@ export default function BlinkViewer({
     imgFalseColorRef.current = loadImg(falseColorBase64);
   }, [imageABase64, imageBBase64, differenceBase64, falseColorBase64]);
 
+  // Helper to obtain a colormapped image/canvas
+  const getProcessedImage = useCallback(
+    (sourceImg: HTMLImageElement | null, cacheKey: string, activeColormap: ColormapMode): HTMLCanvasElement | HTMLImageElement | null => {
+      if (!sourceImg) return null;
+
+      // Default inverted_bw is the raw source image
+      if (activeColormap === 'inverted_bw') {
+        return sourceImg;
+      }
+
+      const fullKey = `${cacheKey}_${activeColormap}`;
+      if (recoloredCanvasesRef.current.has(fullKey)) {
+        return recoloredCanvasesRef.current.get(fullKey)!;
+      }
+
+      // Generate offscreen recolored canvas
+      const offscreen = document.createElement('canvas');
+      offscreen.width = sourceImg.naturalWidth || sourceImg.width || 512;
+      offscreen.height = sourceImg.naturalHeight || sourceImg.height || 512;
+      const oCtx = offscreen.getContext('2d');
+      if (!oCtx) return sourceImg;
+
+      oCtx.drawImage(sourceImg, 0, 0, offscreen.width, offscreen.height);
+      const imgData = oCtx.getImageData(0, 0, offscreen.width, offscreen.height);
+      const data = imgData.data;
+      const lut = getColormapLUT(activeColormap);
+
+      for (let i = 0; i < data.length; i += 4) {
+        // Invert inverted_bw back to positive intensity: 0 = sky background, 255 = bright star
+        const intensity = 255 - data[i];
+        data[i] = lut.r[intensity];
+        data[i + 1] = lut.g[intensity];
+        data[i + 2] = lut.b[intensity];
+        data[i + 3] = 255;
+      }
+
+      oCtx.putImageData(imgData, 0, 0);
+      recoloredCanvasesRef.current.set(fullKey, offscreen);
+      return offscreen;
+    },
+    []
+  );
+
   // 2. Main Canvas Draw Routine
   const drawCanvas = useCallback(() => {
     const canvas = canvasRef.current;
@@ -157,7 +191,7 @@ export default function BlinkViewer({
     ctx.clearRect(0, 0, W, H);
     ctx.save();
 
-    // Apply zoom & pan transformations
+    // Apply zoom & pan transformations around center
     ctx.translate(W / 2 + panOffset.x, H / 2 + panOffset.y);
     ctx.scale(zoomLevel, zoomLevel);
     ctx.translate(-W / 2, -H / 2);
@@ -167,17 +201,21 @@ export default function BlinkViewer({
 
     // A. Draw active image layer according to viewMode
     if (viewMode === 'blink') {
-      const activeImg = showingARef.current ? imgARef.current : imgBRef.current;
-      if (activeImg) ctx.drawImage(activeImg, 0, 0, W, H);
+      const activeSource = showingARef.current ? imgARef.current : imgBRef.current;
+      const cacheKey = showingARef.current ? 'epochA' : 'epochB';
+      const activeDrawable = getProcessedImage(activeSource, cacheKey, colormap);
+      if (activeDrawable) ctx.drawImage(activeDrawable, 0, 0, W, H);
     } else if (viewMode === 'slider') {
       const splitX = sliderPosition * W;
+      const drawableA = getProcessedImage(imgARef.current, 'epochA', colormap);
+      const drawableB = getProcessedImage(imgBRef.current, 'epochB', colormap);
 
       // Draw Image A on the left
       ctx.save();
       ctx.beginPath();
       ctx.rect(0, 0, splitX, H);
       ctx.clip();
-      if (imgARef.current) ctx.drawImage(imgARef.current, 0, 0, W, H);
+      if (drawableA) ctx.drawImage(drawableA, 0, 0, W, H);
       ctx.restore();
 
       // Draw Image B on the right
@@ -185,7 +223,7 @@ export default function BlinkViewer({
       ctx.beginPath();
       ctx.rect(splitX, 0, W - splitX, H);
       ctx.clip();
-      if (imgBRef.current) ctx.drawImage(imgBRef.current, 0, 0, W, H);
+      if (drawableB) ctx.drawImage(drawableB, 0, 0, W, H);
       ctx.restore();
 
       // Vertical Split Line
@@ -202,19 +240,21 @@ export default function BlinkViewer({
       // Divider Handle Circle
       ctx.fillStyle = '#00E5FF';
       ctx.beginPath();
-      ctx.arc(splitX, H / 2, 12 / zoomLevel, 0, Math.PI * 2);
+      ctx.arc(splitX, H / 2, 14 / zoomLevel, 0, Math.PI * 2);
       ctx.fill();
       ctx.fillStyle = '#060810';
-      ctx.font = `bold ${10 / zoomLevel}px monospace`;
+      ctx.font = `bold ${11 / zoomLevel}px monospace`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText('↔', splitX, H / 2);
     } else if (viewMode === 'difference') {
-      const diffImg = imgDiffRef.current || imgBRef.current;
-      if (diffImg) ctx.drawImage(diffImg, 0, 0, W, H);
+      // In difference mode, default to cool_warm if colormap is still inverted_bw
+      const diffColormap = colormap === 'inverted_bw' ? 'cool_warm' : colormap;
+      const diffDrawable = getProcessedImage(imgDiffRef.current || imgBRef.current, 'diff', diffColormap);
+      if (diffDrawable) ctx.drawImage(diffDrawable, 0, 0, W, H);
     } else if (viewMode === 'false_color') {
-      const fcImg = imgFalseColorRef.current || imgARef.current;
-      if (fcImg) ctx.drawImage(fcImg, 0, 0, W, H);
+      const fcDrawable = imgFalseColorRef.current || getProcessedImage(imgARef.current, 'epochA', 'viridis');
+      if (fcDrawable) ctx.drawImage(fcDrawable, 0, 0, W, H);
     }
 
     // B. Draw Candidate Overlays & Hop Vectors
@@ -229,16 +269,16 @@ export default function BlinkViewer({
         const isHovered = cand.id === hoveredCandidate?.id;
         const isHighConf = cand.confidence_score >= 0.7;
 
-        const baseRadius = (10 + cand.confidence_score * 8) / zoomLevel;
+        const baseRadius = (16 + cand.confidence_score * 10) / zoomLevel;
         const ringColor = isSelected ? '#00E5FF' : isHighConf ? '#06D6A0' : '#FFD166';
 
         // Outer Selection Glow
         if (isSelected || isHovered) {
           ctx.beginPath();
-          ctx.arc(px, py, baseRadius + 6 / zoomLevel, 0, Math.PI * 2);
+          ctx.arc(px, py, baseRadius + 8 / zoomLevel, 0, Math.PI * 2);
           ctx.strokeStyle = '#00E5FF';
-          ctx.lineWidth = 2 / zoomLevel;
-          ctx.setLineDash([4 / zoomLevel, 4 / zoomLevel]);
+          ctx.lineWidth = 2.5 / zoomLevel;
+          ctx.setLineDash([5 / zoomLevel, 5 / zoomLevel]);
           ctx.stroke();
           ctx.setLineDash([]);
         }
@@ -247,47 +287,49 @@ export default function BlinkViewer({
         ctx.beginPath();
         ctx.arc(px, py, baseRadius, 0, Math.PI * 2);
         ctx.strokeStyle = ringColor;
-        ctx.lineWidth = 2 / zoomLevel;
+        ctx.lineWidth = 2.5 / zoomLevel;
         ctx.stroke();
 
         // Crosshair Ticks
-        const tick = 4 / zoomLevel;
+        const tick = 6 / zoomLevel;
         ctx.beginPath();
         ctx.moveTo(px - baseRadius - tick, py);
-        ctx.lineTo(px - baseRadius + 1 / zoomLevel, py);
-        ctx.moveTo(px + baseRadius - 1 / zoomLevel, py);
+        ctx.lineTo(px - baseRadius + 2 / zoomLevel, py);
+        ctx.moveTo(px + baseRadius - 2 / zoomLevel, py);
         ctx.lineTo(px + baseRadius + tick, py);
         ctx.moveTo(px, py - baseRadius - tick);
-        ctx.lineTo(px, py - baseRadius + 1 / zoomLevel);
-        ctx.moveTo(px, py + baseRadius - 1 / zoomLevel);
+        ctx.lineTo(px, py - baseRadius + 2 / zoomLevel);
+        ctx.moveTo(px, py + baseRadius - 2 / zoomLevel);
         ctx.lineTo(px, py + baseRadius + tick);
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.75)';
-        ctx.lineWidth = 1.5 / zoomLevel;
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
+        ctx.lineWidth = 2 / zoomLevel;
         ctx.stroke();
 
-        // Astrometric Hopping Vector Arrow (if motion detected)
+        // Astrometric Proper Motion Hop Vector Arrow (if target hops)
         if (cand.proper_motion_mas_yr && cand.proper_motion_mas_yr > 50) {
-          const hopDx = (cand.pixel_x - 50) * 0.12 * (W / 100) / zoomLevel;
-          const hopDy = (cand.pixel_y - 50) * 0.12 * (H / 100) / zoomLevel;
+          // Calculate hop arrow vector scaled to canvas size
+          const arrowLen = Math.max(28, (cand.proper_motion_mas_yr / 1000.0) * 8.0) * (W / 1024) / zoomLevel;
+          const arrowDx = arrowLen * 0.85;
+          const arrowDy = -arrowLen * 0.52;
 
           ctx.beginPath();
           ctx.moveTo(px, py);
-          ctx.lineTo(px + hopDx, py + hopDy);
+          ctx.lineTo(px + arrowDx, py + arrowDy);
           ctx.strokeStyle = '#FFD166';
-          ctx.lineWidth = 2 / zoomLevel;
+          ctx.lineWidth = 2.5 / zoomLevel;
           ctx.stroke();
 
           // Arrowhead
-          const angle = Math.atan2(hopDy, hopDx);
+          const angle = Math.atan2(arrowDy, arrowDx);
           ctx.beginPath();
-          ctx.moveTo(px + hopDx, py + hopDy);
+          ctx.moveTo(px + arrowDx, py + arrowDy);
           ctx.lineTo(
-            px + hopDx - (6 / zoomLevel) * Math.cos(angle - Math.PI / 6),
-            py + hopDy - (6 / zoomLevel) * Math.sin(angle - Math.PI / 6)
+            px + arrowDx - (8 / zoomLevel) * Math.cos(angle - Math.PI / 6),
+            py + arrowDy - (8 / zoomLevel) * Math.sin(angle - Math.PI / 6)
           );
           ctx.lineTo(
-            px + hopDx - (6 / zoomLevel) * Math.cos(angle + Math.PI / 6),
-            py + hopDy - (6 / zoomLevel) * Math.sin(angle + Math.PI / 6)
+            px + arrowDx - (8 / zoomLevel) * Math.cos(angle + Math.PI / 6),
+            py + arrowDy - (8 / zoomLevel) * Math.sin(angle + Math.PI / 6)
           );
           ctx.closePath();
           ctx.fillStyle = '#FFD166';
@@ -296,22 +338,22 @@ export default function BlinkViewer({
 
         // SNR Delta Label
         ctx.fillStyle = ringColor;
-        ctx.font = `bold ${10 / zoomLevel}px monospace`;
+        ctx.font = `bold ${11 / zoomLevel}px monospace`;
         ctx.textAlign = 'left';
         ctx.textBaseline = 'middle';
         ctx.fillText(
           `ΔSNR +${cand.snr_change.toFixed(1)}`,
-          px + baseRadius + 4 / zoomLevel,
-          py - 3 / zoomLevel
+          px + baseRadius + 6 / zoomLevel,
+          py - 4 / zoomLevel
         );
 
         // Classification Tag
-        ctx.fillStyle = 'rgba(240, 244, 255, 0.85)';
-        ctx.font = `${8 / zoomLevel}px monospace`;
+        ctx.fillStyle = 'rgba(240, 244, 255, 0.9)';
+        ctx.font = `${9 / zoomLevel}px monospace`;
         ctx.fillText(
           cand.classification.split(' ')[0],
-          px + baseRadius + 4 / zoomLevel,
-          py + 8 / zoomLevel
+          px + baseRadius + 6 / zoomLevel,
+          py + 10 / zoomLevel
         );
       });
     }
@@ -320,9 +362,9 @@ export default function BlinkViewer({
     if (showCrosshair) {
       const cx = W / 2;
       const cy = H / 2;
-      ctx.strokeStyle = 'rgba(0, 229, 255, 0.35)';
-      ctx.lineWidth = 1 / zoomLevel;
-      ctx.setLineDash([3 / zoomLevel, 3 / zoomLevel]);
+      ctx.strokeStyle = 'rgba(0, 229, 255, 0.4)';
+      ctx.lineWidth = 1.5 / zoomLevel;
+      ctx.setLineDash([4 / zoomLevel, 4 / zoomLevel]);
 
       ctx.beginPath();
       ctx.moveTo(cx, 0);
@@ -345,6 +387,8 @@ export default function BlinkViewer({
     hoveredCandidate,
     showOverlays,
     showCrosshair,
+    colormap,
+    getProcessedImage,
   ]);
 
   // 3. Cadence Blink Loop with Loop-Reset Flash
@@ -406,13 +450,12 @@ export default function BlinkViewer({
     if (!canvas) return;
 
     const rect = canvas.getBoundingClientRect();
-    const clickX = e.clientX - rect.left;
-    const clickY = e.clientY - rect.top;
+    const mouseX = e.clientX - rect.left;
 
     // Check if clicking near vertical split slider line
     if (viewMode === 'slider') {
-      const splitX = sliderPosition * canvas.width;
-      if (Math.abs(clickX - splitX) < 16) {
+      const splitCanvasX = sliderPosition * rect.width;
+      if (Math.abs(mouseX - splitCanvasX) < 20) {
         isDraggingSliderRef.current = true;
         return;
       }
@@ -433,7 +476,7 @@ export default function BlinkViewer({
 
     // Update Split slider position if dragging
     if (isDraggingSliderRef.current && viewMode === 'slider') {
-      const newPos = Math.max(0.02, Math.min(0.98, mouseX / canvas.width));
+      const newPos = Math.max(0.02, Math.min(0.98, mouseX / rect.width));
       setSliderPosition(newPos);
       return;
     }
@@ -451,12 +494,12 @@ export default function BlinkViewer({
     const W = canvas.width;
     const H = canvas.height;
 
-    // Invert zoom & pan
-    const normX = (mouseX - (W / 2 + panOffset.x)) / zoomLevel + W / 2;
-    const normY = (mouseY - (H / 2 + panOffset.y)) / zoomLevel + H / 2;
+    // Invert CSS to canvas scale and zoom & pan
+    const normX = (mouseX / rect.width) * W;
+    const normY = (mouseY / rect.height) * H;
 
-    const px = Math.round(normX);
-    const py = Math.round(normY);
+    const px = Math.round((normX - (W / 2 + panOffset.x)) / zoomLevel + W / 2);
+    const py = Math.round((normY - (H / 2 + panOffset.y)) / zoomLevel + H / 2);
 
     if (px >= 0 && px <= W && py >= 0 && py <= H) {
       // Calculate RA/Dec offset from center based on plate scale
@@ -472,7 +515,7 @@ export default function BlinkViewer({
         y: py,
         ra: curRa,
         dec: curDec,
-        flux: 15.2 + Math.abs(Math.sin(px * 0.1) * Math.cos(py * 0.1)) * 140.0,
+        flux: 15.2 + Math.abs(Math.sin(px * 0.05) * Math.cos(py * 0.05)) * 140.0,
       });
     } else {
       setCursorTelemetry(null);
@@ -483,20 +526,19 @@ export default function BlinkViewer({
       const hovered = candidates.find((c) => {
         const cx = (c.pixel_x * W) / 100;
         const cy = (c.pixel_y * H) / 100;
-        const dist = Math.hypot(normX - cx, normY - cy);
-        return dist < (14 / zoomLevel);
+        const dist = Math.hypot(px - cx, py - cy);
+        return dist < (20 / zoomLevel);
       });
       setHoveredCandidate(hovered || null);
     }
   };
 
-  const handlePointerUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
+  const handlePointerUp = () => {
     isDraggingSliderRef.current = false;
     isPanningRef.current = false;
 
     // Check if clicked a candidate
-    const canvas = canvasRef.current;
-    if (canvas && hoveredCandidate && onCandidateSelect) {
+    if (hoveredCandidate && onCandidateSelect) {
       onCandidateSelect(hoveredCandidate);
     }
   };
@@ -504,17 +546,14 @@ export default function BlinkViewer({
   const handleWheel = (e: React.WheelEvent<HTMLCanvasElement>) => {
     e.preventDefault();
     const zoomFactor = e.deltaY < 0 ? 1.15 : 0.87;
-    setZoomLevel((prev) => Math.max(0.6, Math.min(12.0, prev * zoomFactor)));
+    setZoomLevel((prev) => Math.max(0.4, Math.min(6.0, prev * zoomFactor)));
   };
 
   return (
-    <div
-      ref={containerRef}
-      className={`relative w-full h-full flex flex-col bg-[#04060C] select-none overflow-hidden ${className}`}
-    >
-      {/* 1. Top Astronomical Toolbar (WiseView / Aladin Lite style) */}
-      <div className="relative z-10 px-4 py-2 flex flex-wrap items-center justify-between border-b border-[var(--border-subtle)] bg-[rgba(6,8,16,0.92)] backdrop-blur-md gap-3">
-        {/* Left: View Mode Toggle Buttons */}
+    <div className={`relative flex flex-col w-full h-full bg-[#03050a] text-white select-none ${className}`}>
+      {/* 1. Sleek Top Astronomical Control Toolbar */}
+      <div className="z-20 px-3 py-2 flex flex-wrap items-center justify-between gap-2.5 border-b border-[var(--border-subtle)] bg-[rgba(6,8,16,0.95)] backdrop-blur-md">
+        {/* Left: View Mode Buttons */}
         <div className="flex items-center gap-1 p-0.5 rounded-lg bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.08)]">
           <button
             onClick={() => setViewMode('blink')}
@@ -559,10 +598,23 @@ export default function BlinkViewer({
           </button>
         </div>
 
-        {/* Center: Flipbook Playback Controls (if in Blink mode) */}
+        {/* Center: Blink Playback, Cadence Slider, & Reset LED */}
         {viewMode === 'blink' && (
-          <div className="flex items-center gap-3">
-            {/* Step to Epoch A */}
+          <div className="flex items-center gap-2 px-2 py-0.5 rounded-lg bg-[rgba(255,255,255,0.03)] border border-[rgba(255,255,255,0.06)]">
+            {/* Play/Pause */}
+            <button
+              onClick={() => setIsPlaying((prev) => !prev)}
+              className={`p-1.5 rounded-md transition-all ${
+                isPlaying
+                  ? 'bg-[var(--accent-cyan)] text-[#060810] shadow-[0_0_8px_rgba(0,229,255,0.4)]'
+                  : 'bg-[rgba(255,255,255,0.08)] text-slate-200 hover:bg-[rgba(255,255,255,0.15)]'
+              }`}
+              title={isPlaying ? 'Pause Blink Loop [Space]' : 'Play Blink Loop [Space]'}
+            >
+              {isPlaying ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
+            </button>
+
+            {/* Step A Button */}
             <button
               onClick={() => {
                 showingARef.current = true;
@@ -570,23 +622,17 @@ export default function BlinkViewer({
                 setIsPlaying(false);
                 drawCanvas();
               }}
-              className="p-1.5 rounded-md bg-[rgba(255,255,255,0.06)] hover:bg-[rgba(255,255,255,0.12)] text-slate-300 transition-colors"
-              title="Step to Epoch A [Key 1 / A]"
+              className={`px-2 py-0.5 rounded text-[11px] font-mono font-bold transition-colors ${
+                showingAState
+                  ? 'bg-cyan-500/25 border border-cyan-400 text-cyan-300'
+                  : 'text-slate-400 hover:text-white hover:bg-[rgba(255,255,255,0.08)]'
+              }`}
+              title="View Epoch A [Key A / 1]"
             >
-              <SkipBack className="w-3.5 h-3.5" />
+              Pass 1
             </button>
 
-            {/* Play / Pause Toggle */}
-            <button
-              onClick={() => setIsPlaying((prev) => !prev)}
-              className="flex items-center gap-1.5 px-3 py-1 rounded-md bg-[var(--accent-cyan)] text-[#060810] font-mono text-xs font-semibold hover:brightness-110 transition-all shadow-[0_0_10px_rgba(0,229,255,0.3)]"
-              title="Toggle Play / Pause [Spacebar]"
-            >
-              {isPlaying ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5 fill-current" />}
-              <span>{isPlaying ? 'PAUSE' : 'PLAY'}</span>
-            </button>
-
-            {/* Step to Epoch B */}
+            {/* Step B Button */}
             <button
               onClick={() => {
                 showingARef.current = false;
@@ -594,26 +640,30 @@ export default function BlinkViewer({
                 setIsPlaying(false);
                 drawCanvas();
               }}
-              className="p-1.5 rounded-md bg-[rgba(255,255,255,0.06)] hover:bg-[rgba(255,255,255,0.12)] text-slate-300 transition-colors"
-              title="Step to Epoch B [Key 2 / B]"
+              className={`px-2 py-0.5 rounded text-[11px] font-mono font-bold transition-colors ${
+                !showingAState
+                  ? 'bg-amber-500/25 border border-amber-400 text-amber-300'
+                  : 'text-slate-400 hover:text-white hover:bg-[rgba(255,255,255,0.08)]'
+              }`}
+              title="View Epoch B [Key B / 2]"
             >
-              <SkipForward className="w-3.5 h-3.5" />
+              Pass 2
             </button>
 
-            {/* Blink Cadence Speed Slider */}
-            <div className="flex items-center gap-2 pl-2 border-l border-[rgba(255,255,255,0.1)]">
-              <span className="text-[10px] font-mono text-slate-400">SPEED</span>
+            {/* Cadence Speed Slider (200 - 1600 ms) */}
+            <div className="flex items-center gap-1.5 ml-1">
+              <span className="text-[10px] font-mono text-slate-400 hidden lg:inline">Speed:</span>
               <input
                 type="range"
-                min="200"
-                max="1600"
-                step="50"
+                min={200}
+                max={1600}
+                step={50}
                 value={blinkIntervalMs}
                 onChange={(e) => setBlinkIntervalMs(parseInt(e.target.value, 10))}
-                className="w-20 accent-[var(--accent-cyan)] cursor-pointer"
-                title={`Cadence Interval: ${blinkIntervalMs} ms`}
+                className="w-16 sm:w-24 h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-[var(--accent-cyan)]"
+                title={`Blink Cadence: ${blinkIntervalMs}ms`}
               />
-              <span className="text-[10px] font-mono text-[var(--accent-cyan)] w-10">
+              <span className="text-[10px] font-mono text-cyan-400 w-11 text-right">
                 {blinkIntervalMs}ms
               </span>
             </div>
@@ -631,30 +681,36 @@ export default function BlinkViewer({
         )}
 
         {/* Right: Stretch & Colormap Controls */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           {/* Colormap Selector */}
-          <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.08)]">
-            <Palette className="w-3.5 h-3.5 text-slate-400" />
+          <div className="flex items-center gap-1 bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.08)] rounded-md px-1.5 py-0.5">
+            <Palette className="w-3 h-3 text-slate-400" />
             <select
               value={colormap}
               onChange={(e) => setColormap(e.target.value as ColormapMode)}
-              className="bg-transparent text-xs font-mono text-slate-200 outline-none cursor-pointer"
+              className="bg-transparent text-[11px] font-mono text-slate-200 outline-none cursor-pointer"
+              title="Select Astronomical Colormap (WiseView / Aladin convention)"
             >
-              <option value="inverted_bw" className="bg-[#0b101e] text-white">
-                Inverted B&W (Astro Std)
-              </option>
-              <option value="grayscale" className="bg-[#0b101e] text-white">
-                Grayscale
-              </option>
-              <option value="viridis" className="bg-[#0b101e] text-white">
-                Viridis
-              </option>
-              <option value="inferno" className="bg-[#0b101e] text-white">
-                Inferno
-              </option>
-              <option value="cool_warm" className="bg-[#0b101e] text-white">
-                Cool / Warm (Diff)
-              </option>
+              <option value="inverted_bw" className="bg-[#0b0f19] text-white">Inverted B&W (Astro Std)</option>
+              <option value="grayscale" className="bg-[#0b0f19] text-white">Grayscale</option>
+              <option value="viridis" className="bg-[#0b0f19] text-white">Viridis (Thermal)</option>
+              <option value="inferno" className="bg-[#0b0f19] text-white">Inferno (High Contrast)</option>
+              <option value="cool_warm" className="bg-[#0b0f19] text-white">Cool / Warm (Difference)</option>
+            </select>
+          </div>
+
+          {/* Non-Linear Stretch Selector */}
+          <div className="hidden md:flex items-center gap-1 bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.08)] rounded-md px-1.5 py-0.5">
+            <Sliders className="w-3 h-3 text-slate-400" />
+            <select
+              value={stretchMode}
+              onChange={(e) => setStretchMode(e.target.value as StretchMode)}
+              className="bg-transparent text-[11px] font-mono text-slate-200 outline-none cursor-pointer"
+              title="Astronomical Non-Linear Stretch (Lupton Asinh preserves faint galaxy nebulosity)"
+            >
+              <option value="asinh" className="bg-[#0b0f19] text-white">Lupton Asinh</option>
+              <option value="log" className="bg-[#0b0f19] text-white">Logarithmic</option>
+              <option value="linear" className="bg-[#0b0f19] text-white">Linear</option>
             </select>
           </div>
 
@@ -671,7 +727,20 @@ export default function BlinkViewer({
             <Eye className="w-3.5 h-3.5" />
           </button>
 
-          {/* Reset Zoom & Pan */}
+          {/* Toggle Crosshairs */}
+          <button
+            onClick={() => setShowCrosshair((prev) => !prev)}
+            className={`p-1.5 rounded-md border text-xs transition-colors ${
+              showCrosshair
+                ? 'bg-[rgba(0,229,255,0.15)] border-[var(--accent-cyan)] text-[var(--accent-cyan)]'
+                : 'bg-[rgba(255,255,255,0.05)] border-transparent text-slate-400'
+            }`}
+            title="Toggle Telescope Central Crosshair"
+          >
+            <Crosshair className="w-3.5 h-3.5" />
+          </button>
+
+          {/* Reset Pan & Zoom */}
           <button
             onClick={() => {
               setZoomLevel(1.0);
@@ -685,91 +754,111 @@ export default function BlinkViewer({
         </div>
       </div>
 
-      {/* 2. Main Canvas Viewport with Crosshair & Telemetry */}
-      <div className="relative flex-1 w-full h-full cursor-crosshair overflow-hidden">
-        <canvas
-          ref={canvasRef}
-          width={512}
-          height={512}
-          onPointerDown={handlePointerDown}
-          onPointerMove={handlePointerMove}
-          onPointerUp={handlePointerUp}
-          onWheel={handleWheel}
-          className="w-full h-full block"
-        />
+      {/* 2. Main Center Astronomical Viewport: Strict 1:1 Aspect Ratio */}
+      <div className="relative flex-1 w-full h-full flex items-center justify-center p-2 sm:p-4 bg-[#020408] overflow-hidden">
+        {/* Aspect-Square Enclosure (Guarantees Circular Stars with Zero Distortion) */}
+        <div
+          ref={containerRef}
+          className="relative aspect-square max-w-full max-h-full w-auto h-full flex items-center justify-center rounded-2xl overflow-hidden border border-[rgba(0,229,255,0.25)] shadow-[0_0_50px_rgba(0,0,0,0.95)] bg-black"
+        >
+          {/* Astronomical Frame Corner Reticle Accents */}
+          <div className="absolute top-2.5 left-2.5 w-3.5 h-3.5 border-t-2 border-l-2 border-[var(--accent-cyan)] opacity-70 z-20 pointer-events-none" />
+          <div className="absolute top-2.5 right-2.5 w-3.5 h-3.5 border-t-2 border-r-2 border-[var(--accent-cyan)] opacity-70 z-20 pointer-events-none" />
+          <div className="absolute bottom-2.5 left-2.5 w-3.5 h-3.5 border-b-2 border-l-2 border-[var(--accent-cyan)] opacity-70 z-20 pointer-events-none" />
+          <div className="absolute bottom-2.5 right-2.5 w-3.5 h-3.5 border-b-2 border-r-2 border-[var(--accent-cyan)] opacity-70 z-20 pointer-events-none" />
 
-        {/* Active Epoch Banner Overlay (Blink / Slider mode) */}
-        <div className="absolute top-4 left-4 z-20 flex flex-col gap-1 pointer-events-none select-none">
-          <div className="flex items-center gap-2">
-            <span
-              className={`px-3 py-1 rounded-full text-xs font-mono font-bold border transition-all ${
-                viewMode === 'difference'
-                  ? 'bg-purple-950/80 border-purple-500 text-purple-300 shadow-[0_0_12px_rgba(168,85,247,0.3)]'
+          {/* Celestial Orientation Indicators (North Up, East Left) */}
+          <div className="absolute top-2 left-1/2 -translate-x-1/2 z-20 text-[9px] font-mono text-cyan-400/80 pointer-events-none select-none tracking-widest bg-[rgba(6,8,16,0.6)] px-1.5 py-0.5 rounded">
+            N ▲
+          </div>
+          <div className="absolute top-1/2 left-2 -translate-y-1/2 z-20 text-[9px] font-mono text-cyan-400/80 pointer-events-none select-none tracking-widest bg-[rgba(6,8,16,0.6)] px-1 py-0.5 rounded">
+            ◄ E
+          </div>
+
+          <canvas
+            ref={canvasRef}
+            width={1024}
+            height={1024}
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={handlePointerUp}
+            onWheel={handleWheel}
+            className="w-full h-full block cursor-crosshair select-none"
+          />
+
+          {/* Active Epoch Banner Overlay (Blink / Slider mode) */}
+          <div className="absolute top-4 left-4 z-20 flex flex-col gap-1 pointer-events-none select-none">
+            <div className="flex items-center gap-2">
+              <span
+                className={`px-3 py-1 rounded-full text-xs font-mono font-bold border transition-all ${
+                  viewMode === 'difference'
+                    ? 'bg-purple-950/80 border-purple-500 text-purple-300 shadow-[0_0_12px_rgba(168,85,247,0.3)]'
+                    : showingAState
+                    ? 'bg-cyan-950/80 border-cyan-500 text-cyan-300 shadow-[0_0_12px_rgba(0,229,255,0.3)]'
+                    : 'bg-amber-950/80 border-amber-500 text-amber-300 shadow-[0_0_12px_rgba(245,158,11,0.3)]'
+                }`}
+              >
+                {viewMode === 'difference'
+                  ? 'DIFFERENCE FLUX (IB − IA)'
                   : showingAState
-                  ? 'bg-cyan-950/80 border-cyan-500 text-cyan-300 shadow-[0_0_12px_rgba(0,229,255,0.3)]'
-                  : 'bg-amber-950/80 border-amber-500 text-amber-300 shadow-[0_0_12px_rgba(245,158,11,0.3)]'
-              }`}
-            >
-              {viewMode === 'difference'
-                ? 'DIFFERENCE FLUX (IB − IA)'
-                : showingAState
-                ? `● ${epochALabel.toUpperCase()}`
-                : `● ${epochBLabel.toUpperCase()}`}
-            </span>
+                  ? `● ${epochALabel.toUpperCase()}`
+                  : `● ${epochBLabel.toUpperCase()}`}
+              </span>
 
-            <span className="px-2 py-0.5 rounded-md bg-[rgba(6,8,16,0.7)] border border-[rgba(255,255,255,0.1)] text-[10px] font-mono text-slate-400">
-              ZOOM {zoomLevel.toFixed(1)}x
-            </span>
+              <span className="px-2 py-0.5 rounded-md bg-[rgba(6,8,16,0.7)] border border-[rgba(255,255,255,0.1)] text-[10px] font-mono text-slate-400">
+                ZOOM {zoomLevel.toFixed(1)}x
+              </span>
+            </div>
+
+            <div className="text-[10px] font-mono text-slate-400 flex items-center gap-3">
+              <span>PLATE SCALE: {plateScaleArcsec}″/px</span>
+              <span>FOV: ~13.2′ × 13.2′</span>
+            </div>
           </div>
 
-          <div className="text-[10px] font-mono text-slate-400 flex items-center gap-3">
-            <span>PLATE SCALE: {plateScaleArcsec}″/pixel</span>
-            <span>FOV: ~13.2′ × 13.2′</span>
+          {/* Real-Time Cursor Astrometry HUD (Bottom-Left) */}
+          <div className="absolute bottom-4 left-4 z-20 px-3 py-2 rounded-xl bg-[rgba(6,8,16,0.85)] border border-[var(--border-subtle)] backdrop-blur-md text-[10px] font-mono pointer-events-none select-none flex flex-col gap-0.5 shadow-xl">
+            <div className="text-slate-400 flex items-center gap-2">
+              <Crosshair className="w-3 h-3 text-[var(--accent-cyan)]" />
+              <span className="text-slate-200 font-semibold">ASTROMETRIC READOUT</span>
+            </div>
+            {cursorTelemetry ? (
+              <>
+                <div className="text-cyan-300">
+                  RA {cursorTelemetry.ra.toFixed(4)}° ({degreesToRaSexagesimal(cursorTelemetry.ra)})
+                </div>
+                <div className="text-cyan-300">
+                  DEC {cursorTelemetry.dec >= 0 ? `+${cursorTelemetry.dec.toFixed(4)}` : cursorTelemetry.dec.toFixed(4)}° (
+                  {degreesToDecSexagesimal(cursorTelemetry.dec)})
+                </div>
+                <div className="text-slate-400 flex items-center gap-3">
+                  <span>PIXEL: [{cursorTelemetry.x}, {cursorTelemetry.y}]</span>
+                  <span>FLUX: ~{cursorTelemetry.flux.toFixed(1)} mJy/sr</span>
+                </div>
+              </>
+            ) : (
+              <div className="text-slate-500 italic">Hover over image for live sky coordinates</div>
+            )}
           </div>
-        </div>
 
-        {/* Real-Time Cursor Astrometry HUD (Bottom-Left) */}
-        <div className="absolute bottom-4 left-4 z-20 px-3 py-2 rounded-xl bg-[rgba(6,8,16,0.85)] border border-[var(--border-subtle)] backdrop-blur-md text-[10px] font-mono pointer-events-none select-none flex flex-col gap-0.5 shadow-xl">
-          <div className="text-slate-400 flex items-center gap-2">
-            <Crosshair className="w-3 h-3 text-[var(--accent-cyan)]" />
-            <span className="text-slate-200 font-semibold">ASTROMETRIC READOUT</span>
-          </div>
-          {cursorTelemetry ? (
-            <>
-              <div className="text-cyan-300">
-                RA {cursorTelemetry.ra.toFixed(4)}° ({degreesToRaSexagesimal(cursorTelemetry.ra)})
+          {/* Difference Subtraction Legend Banner (Bottom Center if in difference mode) */}
+          {viewMode === 'difference' && (
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 px-4 py-2 rounded-xl bg-[rgba(6,8,16,0.88)] border border-purple-500/40 backdrop-blur-md text-[10px] font-mono flex items-center gap-4 shadow-2xl pointer-events-none select-none">
+              <div className="flex items-center gap-1.5 text-blue-400">
+                <span className="w-2.5 h-2.5 rounded-full bg-blue-500" />
+                <span>Negative Flux (Dimmer in B)</span>
               </div>
-              <div className="text-cyan-300">
-                DEC {cursorTelemetry.dec >= 0 ? `+${cursorTelemetry.dec.toFixed(4)}` : cursorTelemetry.dec.toFixed(4)}° (
-                {degreesToDecSexagesimal(cursorTelemetry.dec)})
+              <div className="flex items-center gap-1.5 text-slate-400">
+                <span className="w-2.5 h-2.5 rounded-full bg-slate-500" />
+                <span>Zero Delta (Static Stars)</span>
               </div>
-              <div className="text-slate-400 flex items-center gap-3">
-                <span>PIXEL: [{cursorTelemetry.x}, {cursorTelemetry.y}]</span>
-                <span>FLUX: ~{cursorTelemetry.flux.toFixed(1)} mJy/sr</span>
+              <div className="flex items-center gap-1.5 text-amber-400">
+                <span className="w-2.5 h-2.5 rounded-full bg-amber-500" />
+                <span>Positive Flux (Brighter / Hopped)</span>
               </div>
-            </>
-          ) : (
-            <div className="text-slate-500 italic">Hover over image for live sky coordinates</div>
+            </div>
           )}
         </div>
-
-        {/* Difference Subtraction Legend Banner (Bottom Center if in difference mode) */}
-        {viewMode === 'difference' && (
-          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 px-4 py-2 rounded-xl bg-[rgba(6,8,16,0.88)] border border-purple-500/40 backdrop-blur-md text-[10px] font-mono flex items-center gap-4 shadow-2xl pointer-events-none select-none">
-            <div className="flex items-center gap-1.5 text-blue-400">
-              <span className="w-2.5 h-2.5 rounded-full bg-blue-500" />
-              <span>Negative Flux (Dimmer in B)</span>
-            </div>
-            <div className="flex items-center gap-1.5 text-slate-400">
-              <span className="w-2.5 h-2.5 rounded-full bg-slate-500" />
-              <span>Zero Delta (Static Stars)</span>
-            </div>
-            <div className="flex items-center gap-1.5 text-amber-400">
-              <span className="w-2.5 h-2.5 rounded-full bg-amber-500" />
-              <span>Positive Flux (Brighter / Hopped)</span>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );
