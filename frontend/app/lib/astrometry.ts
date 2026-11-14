@@ -37,6 +37,11 @@ export function vectorToIcrs(vec: THREE.Vector3): { ra: number; dec: number } {
   };
 }
 
+export function unitVectorToICRS(v: THREE.Vector3): { raDeg: number; decDeg: number } {
+  const res = vectorToIcrs(v);
+  return { raDeg: res.ra, decDeg: res.dec };
+}
+
 /**
  * Converts Equatorial (RA, Dec) to Galactic coordinates (l, b in degrees)
  * IAU 1958 standard definition:
